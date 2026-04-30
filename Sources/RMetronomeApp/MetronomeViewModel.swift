@@ -1,0 +1,192 @@
+import Foundation
+import Observation
+import RMetronomeCore
+
+@Observable
+@MainActor
+final class MetronomeViewModel {
+    var bpm: Double = 120
+    var beatsPerMeasure: Int = 4
+    var beatUnit: Int = 4
+    var groupingText = ""
+    var patternText = ""
+    var subdivision: Subdivision = .none
+    var muteEveryOtherMeasure = false
+    var tempoRampEnabled = false
+    var rampStep: Double = 5
+    var rampEveryMeasures: Int = 4
+    var rampMaximumBPM: Double = 180
+    var accentGain: Double = 1.0
+    var normalGain: Double = 0.8
+    var subdivisionGain: Double = 0.6
+    var outputDevices: [String] = []
+    var isPlaying = false
+    var status = "Ready"
+
+    private let transport = MetronomeTransport()
+    private var tapTimes: [Date] = []
+
+    func togglePlayback() {
+        if isPlaying {
+            stop()
+        } else {
+            start()
+        }
+    }
+
+    func start() {
+        stop()
+
+        do {
+            try transport.start(state: try makeState(isPlaying: true))
+            isPlaying = true
+            status = "Playing \(Int(bpm)) BPM"
+        } catch {
+            isPlaying = false
+            status = "Audio error: \(error.localizedDescription)"
+        }
+    }
+
+    func stop() {
+        transport.stop()
+        isPlaying = false
+        status = "Stopped"
+    }
+
+    func applyChangedTiming() {
+        guard isPlaying else { return }
+        do {
+            transport.update(state: try makeState(isPlaying: true))
+            status = "Playing \(Int(bpm)) BPM"
+        } catch {
+            status = "Pattern error: \(error.localizedDescription)"
+        }
+    }
+
+    func applyGroupingText() {
+        if let grouping = try? Pattern.parseGrouping(groupingText), !grouping.isEmpty {
+            beatsPerMeasure = grouping.reduce(0, +)
+            patternText = ""
+        }
+        applyChangedTiming()
+    }
+
+    func applyPatternText() {
+        if let pattern = try? Pattern.parseBeatGrid(patternText) {
+            beatsPerMeasure = pattern.beats.count
+            groupingText = ""
+        }
+        applyChangedTiming()
+    }
+
+    func applyPreset(_ preset: PatternPreset) {
+        switch preset {
+        case .fourFour:
+            beatsPerMeasure = 4
+            beatUnit = 4
+            groupingText = ""
+            patternText = ""
+        case .sixEight:
+            beatsPerMeasure = 6
+            beatUnit = 8
+            groupingText = "3+3"
+            patternText = ""
+        case .sevenEight:
+            beatsPerMeasure = 7
+            beatUnit = 8
+            groupingText = "3+2+2"
+            patternText = ""
+        case .clave:
+            beatsPerMeasure = 8
+            beatUnit = 8
+            groupingText = ""
+            patternText = "A x n x n x A x"
+        }
+        applyChangedTiming()
+    }
+
+    func tapTempo() {
+        let now = Date()
+        tapTimes.append(now)
+        tapTimes = tapTimes.suffix(6)
+
+        guard tapTimes.count >= 2 else {
+            status = "Tap again"
+            return
+        }
+
+        let intervals = zip(tapTimes.dropFirst(), tapTimes).map { newer, older in
+            newer.timeIntervalSince(older)
+        }
+        let average = intervals.reduce(0, +) / Double(intervals.count)
+        guard average > 0 else { return }
+
+        bpm = min(max((60.0 / average).rounded(), 20), 300)
+        applyChangedTiming()
+    }
+
+    func refreshDevices() {
+        do {
+            outputDevices = try OutputDeviceManager.outputDevices().map { device in
+                "\(device.name) (\(device.outputChannelCount) ch)"
+            }
+        } catch {
+            outputDevices = ["Device query failed"]
+        }
+    }
+
+    private func makePattern() throws -> Pattern {
+        let trimmedPattern = patternText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedPattern.isEmpty {
+            return try Pattern.parseBeatGrid(trimmedPattern)
+        }
+
+        let trimmedGrouping = groupingText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedGrouping.isEmpty {
+            return Pattern.regular(beatsPerMeasure: beatsPerMeasure)
+        }
+        return try Pattern.grouped(Pattern.parseGrouping(trimmedGrouping))
+    }
+
+    private func makeState(isPlaying: Bool) throws -> MetronomeState {
+        let pattern = try makePattern()
+        return MetronomeState(
+            bpm: bpm,
+            timeSignature: TimeSignature(beatsPerMeasure: pattern.beats.count, beatUnit: beatUnit),
+            pattern: pattern,
+            subdivision: subdivision,
+            muteTrainer: muteEveryOtherMeasure ? .everyOtherMeasure : nil,
+            tempoRamp: tempoRampEnabled ? TempoRamp(
+                bpmStep: rampStep,
+                everyMeasures: rampEveryMeasures,
+                maximumBPM: rampMaximumBPM
+            ) : nil,
+            layerGains: LayerGains(
+                accent: Float(accentGain),
+                normal: Float(normalGain),
+                subdivision: Float(subdivisionGain)
+            ),
+            isPlaying: isPlaying
+        )
+    }
+}
+
+enum PatternPreset: CaseIterable {
+    case fourFour
+    case sixEight
+    case sevenEight
+    case clave
+
+    var title: String {
+        switch self {
+        case .fourFour:
+            "4/4"
+        case .sixEight:
+            "6/8"
+        case .sevenEight:
+            "3+2+2"
+        case .clave:
+            "Clave"
+        }
+    }
+}
