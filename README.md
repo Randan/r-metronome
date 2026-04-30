@@ -47,6 +47,18 @@ With a custom beat grid:
 swift run r-metronome --bpm 120 --pattern "A n n x" --duration 15
 ```
 
+With a preset:
+
+```bash
+swift run r-metronome --preset 3+2+2 --duration 15
+```
+
+Inspect scheduled events without audio:
+
+```bash
+swift run r-metronome --dry-run --duration 4
+```
+
 With mute trainer:
 
 ```bash

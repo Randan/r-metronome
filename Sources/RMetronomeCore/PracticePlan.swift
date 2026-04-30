@@ -23,6 +23,12 @@ public struct TempoRamp: Equatable, Sendable {
         }
         return max(1.0, bounded)
     }
+
+    public var summary: String {
+        let sign = bpmStep >= 0 ? "+" : ""
+        let cap = maximumBPM.map { ", max \(Int($0.rounded()))" } ?? ""
+        return "\(sign)\(Int(bpmStep.rounded())) BPM every \(everyMeasures) measures\(cap)"
+    }
 }
 
 public struct MuteTrainer: Equatable, Sendable {

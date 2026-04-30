@@ -79,7 +79,7 @@ final class MetronomeViewModel {
         applyChangedTiming()
     }
 
-    func applyPreset(_ preset: PatternPreset) {
+    func applyPreset(_ preset: MetronomePreset) {
         switch preset {
         case .fourFour:
             beatsPerMeasure = 4
@@ -168,25 +168,5 @@ final class MetronomeViewModel {
             ),
             isPlaying: isPlaying
         )
-    }
-}
-
-enum PatternPreset: CaseIterable {
-    case fourFour
-    case sixEight
-    case sevenEight
-    case clave
-
-    var title: String {
-        switch self {
-        case .fourFour:
-            "4/4"
-        case .sixEight:
-            "6/8"
-        case .sevenEight:
-            "3+2+2"
-        case .clave:
-            "Clave"
-        }
     }
 }

@@ -10,6 +10,7 @@ struct CLIOptions {
     var subdivision: Subdivision = .none
     var grouping: [Int]?
     var patternText: String?
+    var preset: MetronomePreset?
     var muteEveryOtherMeasure = false
     var rampStep: Double?
     var rampEveryMeasures = 4
@@ -18,6 +19,8 @@ struct CLIOptions {
     var normalGain: Float = 0.8
     var subdivisionGain: Float = 0.6
     var listDevices = false
+    var listPresets = false
+    var dryRun = false
 }
 
 enum CLIError: Error, CustomStringConvertible {
@@ -43,6 +46,10 @@ struct RMetronomeCLI {
                 try printDevices()
                 return
             }
+            if options.listPresets {
+                printPresets()
+                return
+            }
             try run(options: options)
         } catch let error as CLIError {
             FileHandle.standardError.write(Data((error.description + "\n\n" + helpText()).utf8))
@@ -52,9 +59,10 @@ struct RMetronomeCLI {
 
     private static func run(options: CLIOptions) throws {
         let pattern = try makePattern(options: options)
+        let beatUnit = options.preset?.beatUnit ?? options.beatUnit
         let state = MetronomeState(
             bpm: options.bpm,
-            timeSignature: TimeSignature(beatsPerMeasure: pattern.beats.count, beatUnit: options.beatUnit),
+            timeSignature: TimeSignature(beatsPerMeasure: pattern.beats.count, beatUnit: beatUnit),
             pattern: pattern,
             subdivision: options.subdivision,
             muteTrainer: options.muteEveryOtherMeasure ? .everyOtherMeasure : nil,
@@ -68,12 +76,18 @@ struct RMetronomeCLI {
             ),
             isPlaying: true
         )
+
+        if options.dryRun {
+            printDryRun(state: state, sampleRate: options.sampleRate, duration: options.duration)
+            return
+        }
+
         let transport = MetronomeTransport(
             configuration: .init(sampleRate: options.sampleRate, lookaheadSeconds: 1.5, refillIntervalSeconds: 0.25)
         )
         try transport.start(state: state)
 
-        let meterLabel = "\(pattern.beats.count)/\(options.beatUnit)"
+        let meterLabel = "\(pattern.beats.count)/\(beatUnit)"
         let groupingLabel = pattern.grouping.isEmpty ? "" : " grouping \(pattern.grouping.map(String.init).joined(separator: "+")),"
         let muteLabel = options.muteEveryOtherMeasure ? " mute every other measure," : ""
         let rampLabel = options.rampStep.map { " ramp \($0 >= 0 ? "+" : "")\(String(format: "%.1f", $0)) BPM every \(options.rampEveryMeasures) measures," } ?? ""
@@ -96,6 +110,24 @@ struct RMetronomeCLI {
         }
     }
 
+    private static func printPresets() {
+        for preset in MetronomePreset.allCases {
+            print("\(preset.rawValue)\t\(preset.title)")
+        }
+    }
+
+    private static func printDryRun(state: MetronomeState, sampleRate: Double, duration: Double) {
+        let scheduler = MetronomeScheduler(sampleRate: sampleRate, startSampleTime: 0, state: state)
+        let upperBound = Int64((duration * sampleRate).rounded(.up))
+        let events = scheduler.events(from: 0, through: upperBound)
+
+        print(state.summary)
+        for event in events {
+            let seconds = Double(event.sampleTime) / sampleRate
+            print("\(event.sampleTime)\t\(String(format: "%.6f", seconds))s\tbeat \(event.beatIndex)\t\(event.layer)")
+        }
+    }
+
     private static func parseOptions(_ arguments: [String]) throws -> CLIOptions {
         var options = CLIOptions()
         var index = 0
@@ -108,6 +140,10 @@ struct RMetronomeCLI {
                 Foundation.exit(0)
             case "--list-devices":
                 options.listDevices = true
+            case "--list-presets":
+                options.listPresets = true
+            case "--dry-run":
+                options.dryRun = true
             case "--bpm":
                 options.bpm = try readDouble(arguments, &index, option: argument)
             case "--duration":
@@ -126,6 +162,9 @@ struct RMetronomeCLI {
                 options.grouping = try parseGrouping(value, option: argument)
             case "--pattern":
                 options.patternText = try readString(arguments, &index, option: argument)
+            case "--preset":
+                let value = try readString(arguments, &index, option: argument)
+                options.preset = try parsePreset(value, option: argument)
             case "--mute-every-other":
                 options.muteEveryOtherMeasure = true
             case "--ramp-step":
@@ -210,7 +249,17 @@ struct RMetronomeCLI {
         }
     }
 
+    private static func parsePreset(_ value: String, option: String) throws -> MetronomePreset {
+        guard let preset = MetronomePreset(rawValue: value.lowercased()) else {
+            throw CLIError.invalidValue(option, value)
+        }
+        return preset
+    }
+
     private static func makePattern(options: CLIOptions) throws -> Pattern {
+        if let preset = options.preset {
+            return try preset.pattern
+        }
         if let patternText = options.patternText {
             return try Pattern.parseBeatGrid(patternText)
         }
@@ -230,6 +279,7 @@ struct RMetronomeCLI {
           --duration <seconds>        Playback duration. Default: 10
           --beats <count>             Beats per measure. Default: 4
           --beat-unit <unit>          Beat unit. Default: 4
+          --preset <name>             4/4|6/8|3+2+2|clave
           --grouping <pattern>        Accent grouping, for example 3+2+2
           --pattern <grid>            Beat grid, for example "A n n x"
           --mute-every-other          Mute every second measure while transport continues
@@ -242,6 +292,8 @@ struct RMetronomeCLI {
           --subdivision <value>       none|eighths|triplets|sixteenths or 1|2|3|4
           --sample-rate <hz>          Internal click buffer sample rate. Default: 48000
           --list-devices              Print CoreAudio output devices
+          --list-presets              Print built-in presets
+          --dry-run                   Print scheduled events without starting audio
           --help                      Show this help
         """
     }

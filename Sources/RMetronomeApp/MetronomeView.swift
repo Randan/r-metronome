@@ -92,7 +92,7 @@ struct MetronomeView: View {
 
     private var presetControl: some View {
         HStack(spacing: 8) {
-            ForEach(PatternPreset.allCases, id: \.title) { preset in
+            ForEach(MetronomePreset.allCases, id: \.rawValue) { preset in
                 Button(preset.title) {
                     viewModel.applyPreset(preset)
                 }

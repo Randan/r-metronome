@@ -108,6 +108,34 @@ final class MetronomeSchedulerTests: XCTestCase {
         XCTAssertEqual(gains.subdivision, 0.25)
     }
 
+    func testMetronomePresetsProduceExpectedPatterns() throws {
+        let sixEight = try MetronomePreset.sixEight.pattern
+        let sevenEight = try MetronomePreset.sevenEight.pattern
+        let clave = try MetronomePreset.clave.pattern
+
+        XCTAssertEqual(MetronomePreset.sixEight.beatUnit, 8)
+        XCTAssertEqual(sixEight.beatGridString, "A n n A n n")
+        XCTAssertEqual(sevenEight.beatGridString, "A n n A n A n")
+        XCTAssertEqual(clave.beatGridString, "A x n x n x A x")
+    }
+
+    func testStateSummaryIncludesPracticeOptions() {
+        let state = MetronomeState(
+            bpm: 100,
+            timeSignature: TimeSignature(beatsPerMeasure: 4, beatUnit: 4),
+            pattern: .regular(beatsPerMeasure: 4),
+            subdivision: .eighths,
+            muteTrainer: .everyOtherMeasure,
+            tempoRamp: TempoRamp(bpmStep: 5, everyMeasures: 2, maximumBPM: 140),
+            isPlaying: true
+        )
+
+        XCTAssertEqual(
+            state.summary,
+            "100 BPM, 4/4, A n n n, subdivision eighths, mute trainer, ramp +5 BPM every 2 measures, max 140"
+        )
+    }
+
     func testMuteTrainerSkipsEventsWithoutStoppingTransport() {
         let state = MetronomeState(
             bpm: 60,

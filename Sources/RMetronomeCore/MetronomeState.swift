@@ -62,9 +62,44 @@ public struct TimeSignature: Equatable, Sendable {
     }
 }
 
+public extension MetronomeState {
+    var summary: String {
+        var parts = [
+            "\(Int(bpm.rounded())) BPM",
+            "\(timeSignature.beatsPerMeasure)/\(timeSignature.beatUnit)",
+            pattern.beatGridString
+        ]
+
+        if subdivision != .none {
+            parts.append("subdivision \(subdivision.title)")
+        }
+        if muteTrainer != nil {
+            parts.append("mute trainer")
+        }
+        if let tempoRamp {
+            parts.append("ramp \(tempoRamp.summary)")
+        }
+
+        return parts.joined(separator: ", ")
+    }
+}
+
 public enum Subdivision: Int, Equatable, Sendable {
     case none = 1
     case eighths = 2
     case triplets = 3
     case sixteenths = 4
+
+    public var title: String {
+        switch self {
+        case .none:
+            "none"
+        case .eighths:
+            "eighths"
+        case .triplets:
+            "triplets"
+        case .sixteenths:
+            "sixteenths"
+        }
+    }
 }
