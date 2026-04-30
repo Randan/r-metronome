@@ -15,9 +15,12 @@ struct CLIOptions {
     var rampStep: Double?
     var rampEveryMeasures = 4
     var rampMaximumBPM: Double?
+    var polyrhythmBPM: Double?
+    var polyrhythmBeats = 3
     var accentGain: Float = 1.0
     var normalGain: Float = 0.8
     var subdivisionGain: Float = 0.6
+    var polyrhythmGain: Float = 0.7
     var listDevices = false
     var listPresets = false
     var dryRun = false
@@ -69,10 +72,14 @@ struct RMetronomeCLI {
             tempoRamp: options.rampStep.map {
                 TempoRamp(bpmStep: $0, everyMeasures: options.rampEveryMeasures, maximumBPM: options.rampMaximumBPM)
             },
+            polyrhythm: options.polyrhythmBPM.map {
+                PolyrhythmSettings.regular(bpm: $0, beats: options.polyrhythmBeats)
+            },
             layerGains: LayerGains(
                 accent: options.accentGain,
                 normal: options.normalGain,
-                subdivision: options.subdivisionGain
+                subdivision: options.subdivisionGain,
+                polyrhythm: options.polyrhythmGain
             ),
             isPlaying: true
         )
@@ -91,7 +98,8 @@ struct RMetronomeCLI {
         let groupingLabel = pattern.grouping.isEmpty ? "" : " grouping \(pattern.grouping.map(String.init).joined(separator: "+")),"
         let muteLabel = options.muteEveryOtherMeasure ? " mute every other measure," : ""
         let rampLabel = options.rampStep.map { " ramp \($0 >= 0 ? "+" : "")\(String(format: "%.1f", $0)) BPM every \(options.rampEveryMeasures) measures," } ?? ""
-        print("r-metronome: \(Int(options.bpm)) BPM, \(meterLabel),\(groupingLabel)\(muteLabel)\(rampLabel) \(String(format: "%.1f", options.duration))s")
+        let polyLabel = options.polyrhythmBPM.map { " poly \(Int($0.rounded())) BPM/\(options.polyrhythmBeats) beats," } ?? ""
+        print("r-metronome: \(Int(options.bpm)) BPM, \(meterLabel),\(groupingLabel)\(muteLabel)\(rampLabel)\(polyLabel) \(String(format: "%.1f", options.duration))s")
         print("transport lookahead: 1.5s")
 
         Thread.sleep(forTimeInterval: options.duration + 0.2)
@@ -173,12 +181,18 @@ struct RMetronomeCLI {
                 options.rampEveryMeasures = try readInt(arguments, &index, option: argument)
             case "--ramp-max":
                 options.rampMaximumBPM = try readDouble(arguments, &index, option: argument)
+            case "--poly-bpm":
+                options.polyrhythmBPM = try readDouble(arguments, &index, option: argument)
+            case "--poly-beats":
+                options.polyrhythmBeats = try readInt(arguments, &index, option: argument)
             case "--accent-gain":
                 options.accentGain = try readFloat(arguments, &index, option: argument)
             case "--normal-gain":
                 options.normalGain = try readFloat(arguments, &index, option: argument)
             case "--subdivision-gain":
                 options.subdivisionGain = try readFloat(arguments, &index, option: argument)
+            case "--poly-gain":
+                options.polyrhythmGain = try readFloat(arguments, &index, option: argument)
             default:
                 throw CLIError.invalidValue("argument", argument)
             }
@@ -191,9 +205,14 @@ struct RMetronomeCLI {
         guard options.beatsPerMeasure > 0 else { throw CLIError.invalidValue("--beats", "\(options.beatsPerMeasure)") }
         guard options.beatUnit > 0 else { throw CLIError.invalidValue("--beat-unit", "\(options.beatUnit)") }
         guard options.rampEveryMeasures > 0 else { throw CLIError.invalidValue("--ramp-every", "\(options.rampEveryMeasures)") }
+        if let polyrhythmBPM = options.polyrhythmBPM {
+            guard polyrhythmBPM > 0 else { throw CLIError.invalidValue("--poly-bpm", "\(polyrhythmBPM)") }
+        }
+        guard options.polyrhythmBeats > 0 else { throw CLIError.invalidValue("--poly-beats", "\(options.polyrhythmBeats)") }
         guard (0...1).contains(options.accentGain) else { throw CLIError.invalidValue("--accent-gain", "\(options.accentGain)") }
         guard (0...1).contains(options.normalGain) else { throw CLIError.invalidValue("--normal-gain", "\(options.normalGain)") }
         guard (0...1).contains(options.subdivisionGain) else { throw CLIError.invalidValue("--subdivision-gain", "\(options.subdivisionGain)") }
+        guard (0...1).contains(options.polyrhythmGain) else { throw CLIError.invalidValue("--poly-gain", "\(options.polyrhythmGain)") }
         if let grouping = options.grouping {
             options.beatsPerMeasure = grouping.reduce(0, +)
         }
@@ -286,9 +305,12 @@ struct RMetronomeCLI {
           --ramp-step <bpm>           Change BPM by this amount at ramp boundaries
           --ramp-every <measures>     Measures per ramp step. Default: 4
           --ramp-max <bpm>            Optional maximum BPM for upward ramps
+          --poly-bpm <number>         Enable a synchronized secondary rhythm
+          --poly-beats <count>        Secondary pattern length. Default: 3
           --accent-gain <0...1>       Accent volume. Default: 1.0
           --normal-gain <0...1>       Normal volume. Default: 0.8
           --subdivision-gain <0...1>  Subdivision volume. Default: 0.6
+          --poly-gain <0...1>         Polyrhythm volume. Default: 0.7
           --subdivision <value>       none|eighths|triplets|sixteenths or 1|2|3|4
           --sample-rate <hz>          Internal click buffer sample rate. Default: 48000
           --list-devices              Print CoreAudio output devices

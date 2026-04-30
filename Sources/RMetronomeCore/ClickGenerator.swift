@@ -6,6 +6,7 @@ public final class ClickGenerator {
         public let accent: AVAudioPCMBuffer
         public let normal: AVAudioPCMBuffer
         public let subdivision: AVAudioPCMBuffer
+        public let polyrhythm: AVAudioPCMBuffer
     }
 
     public let format: AVAudioFormat
@@ -25,7 +26,8 @@ public final class ClickGenerator {
         self.buffers = Buffers(
             accent: Self.makeClick(format: format, frequency: 1600, duration: 0.020, gain: 0.9),
             normal: Self.makeClick(format: format, frequency: 1100, duration: 0.016, gain: 0.65),
-            subdivision: Self.makeClick(format: format, frequency: 850, duration: 0.010, gain: 0.45)
+            subdivision: Self.makeClick(format: format, frequency: 850, duration: 0.010, gain: 0.45),
+            polyrhythm: Self.makeClick(format: format, frequency: 600, duration: 0.018, gain: 0.65)
         )
     }
 
@@ -37,6 +39,8 @@ public final class ClickGenerator {
             buffers.normal
         case .subdivision:
             buffers.subdivision
+        case .polyrhythm:
+            buffers.polyrhythm
         }
     }
 

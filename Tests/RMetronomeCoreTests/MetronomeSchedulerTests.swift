@@ -101,11 +101,12 @@ final class MetronomeSchedulerTests: XCTestCase {
     }
 
     func testLayerGainsClampToUnitRange() {
-        let gains = LayerGains(accent: 1.5, normal: -1, subdivision: 0.25)
+        let gains = LayerGains(accent: 1.5, normal: -1, subdivision: 0.25, polyrhythm: 2)
 
         XCTAssertEqual(gains.accent, 1)
         XCTAssertEqual(gains.normal, 0)
         XCTAssertEqual(gains.subdivision, 0.25)
+        XCTAssertEqual(gains.polyrhythm, 1)
     }
 
     func testMetronomePresetsProduceExpectedPatterns() throws {
@@ -134,6 +135,34 @@ final class MetronomeSchedulerTests: XCTestCase {
             state.summary,
             "100 BPM, 4/4, A n n n, subdivision eighths, mute trainer, ramp +5 BPM every 2 measures, max 140"
         )
+    }
+
+    func testPolyrhythmEventsShareStartSampleTimeWithPrimaryScheduler() {
+        let state = MetronomeState(
+            bpm: 60,
+            timeSignature: TimeSignature(beatsPerMeasure: 4, beatUnit: 4),
+            pattern: .regular(beatsPerMeasure: 4),
+            polyrhythm: .regular(bpm: 120, beats: 3),
+            isPlaying: true
+        )
+        let scheduler = MetronomeScheduler(sampleRate: 1_000, startSampleTime: 0, state: state)
+
+        let events = scheduler.events(from: 0, through: 1_500)
+
+        XCTAssertEqual(events.map(\.sampleTime), [0, 0, 500, 1_000, 1_000, 1_500])
+        XCTAssertEqual(events.map(\.layer), [.accent, .polyrhythm, .polyrhythm, .normal, .polyrhythm, .polyrhythm])
+    }
+
+    func testStateSummaryIncludesPolyrhythm() {
+        let state = MetronomeState(
+            bpm: 120,
+            timeSignature: TimeSignature(beatsPerMeasure: 4, beatUnit: 4),
+            pattern: .regular(beatsPerMeasure: 4),
+            polyrhythm: .regular(bpm: 180, beats: 3),
+            isPlaying: true
+        )
+
+        XCTAssertEqual(state.summary, "120 BPM, 4/4, A n n n, poly 180 BPM")
     }
 
     func testMuteTrainerSkipsEventsWithoutStoppingTransport() {

@@ -7,6 +7,7 @@ public struct MetronomeState: Equatable, Sendable {
     public var subdivision: Subdivision
     public var muteTrainer: MuteTrainer?
     public var tempoRamp: TempoRamp?
+    public var polyrhythm: PolyrhythmSettings?
     public var layerGains: LayerGains
     public var isPlaying: Bool
 
@@ -17,6 +18,7 @@ public struct MetronomeState: Equatable, Sendable {
         subdivision: Subdivision = .none,
         muteTrainer: MuteTrainer? = nil,
         tempoRamp: TempoRamp? = nil,
+        polyrhythm: PolyrhythmSettings? = nil,
         layerGains: LayerGains = .default,
         isPlaying: Bool = false
     ) {
@@ -27,6 +29,7 @@ public struct MetronomeState: Equatable, Sendable {
         self.subdivision = subdivision
         self.muteTrainer = muteTrainer
         self.tempoRamp = tempoRamp
+        self.polyrhythm = polyrhythm
         self.layerGains = layerGains
         self.isPlaying = isPlaying
     }
@@ -36,11 +39,13 @@ public struct LayerGains: Equatable, Sendable {
     public var accent: Float
     public var normal: Float
     public var subdivision: Float
+    public var polyrhythm: Float
 
-    public init(accent: Float = 1.0, normal: Float = 0.8, subdivision: Float = 0.6) {
+    public init(accent: Float = 1.0, normal: Float = 0.8, subdivision: Float = 0.6, polyrhythm: Float = 0.7) {
         self.accent = Self.clamp(accent)
         self.normal = Self.clamp(normal)
         self.subdivision = Self.clamp(subdivision)
+        self.polyrhythm = Self.clamp(polyrhythm)
     }
 
     public static let `default` = LayerGains()
@@ -78,6 +83,9 @@ public extension MetronomeState {
         }
         if let tempoRamp {
             parts.append("ramp \(tempoRamp.summary)")
+        }
+        if let polyrhythm {
+            parts.append("poly \(Int(polyrhythm.bpm.rounded())) BPM")
         }
 
         return parts.joined(separator: ", ")

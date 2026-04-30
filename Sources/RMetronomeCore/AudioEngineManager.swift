@@ -10,6 +10,7 @@ public final class AudioEngineManager {
     public let accentNode: AVAudioPlayerNode
     public let normalNode: AVAudioPlayerNode
     public let subdivisionNode: AVAudioPlayerNode
+    public let polyrhythmNode: AVAudioPlayerNode
 
     private let clickGenerator: ClickGenerator
 
@@ -18,6 +19,7 @@ public final class AudioEngineManager {
         self.accentNode = AVAudioPlayerNode()
         self.normalNode = AVAudioPlayerNode()
         self.subdivisionNode = AVAudioPlayerNode()
+        self.polyrhythmNode = AVAudioPlayerNode()
         self.clickGenerator = ClickGenerator(sampleRate: sampleRate)
         configureGraph()
         updateGains(layerGains)
@@ -27,7 +29,7 @@ public final class AudioEngineManager {
         if !engine.isRunning {
             try engine.start()
         }
-        [accentNode, normalNode, subdivisionNode].forEach { node in
+        [accentNode, normalNode, subdivisionNode, polyrhythmNode].forEach { node in
             if !node.isPlaying {
                 node.play()
             }
@@ -35,7 +37,7 @@ public final class AudioEngineManager {
     }
 
     public func stop() {
-        [accentNode, normalNode, subdivisionNode].forEach { node in
+        [accentNode, normalNode, subdivisionNode, polyrhythmNode].forEach { node in
             node.stop()
             node.reset()
         }
@@ -65,11 +67,12 @@ public final class AudioEngineManager {
         accentNode.volume = gains.accent
         normalNode.volume = gains.normal
         subdivisionNode.volume = gains.subdivision
+        polyrhythmNode.volume = gains.polyrhythm
     }
 
     private func configureGraph() {
         let mixer = engine.mainMixerNode
-        [accentNode, normalNode, subdivisionNode].forEach { node in
+        [accentNode, normalNode, subdivisionNode, polyrhythmNode].forEach { node in
             engine.attach(node)
             engine.connect(node, to: mixer, format: clickGenerator.format)
         }
@@ -83,6 +86,8 @@ public final class AudioEngineManager {
             normalNode
         case .subdivision:
             subdivisionNode
+        case .polyrhythm:
+            polyrhythmNode
         }
     }
 }

@@ -71,6 +71,12 @@ With tempo ramp:
 swift run r-metronome --bpm 100 --ramp-step 5 --ramp-every 4 --ramp-max 140 --duration 60
 ```
 
+With a secondary polyrhythm layer:
+
+```bash
+swift run r-metronome --bpm 120 --poly-bpm 180 --poly-beats 3 --duration 20
+```
+
 With mixer gains:
 
 ```bash
@@ -89,7 +95,7 @@ Run the SwiftUI macOS app:
 swift run r-metronome-app
 ```
 
-The app includes pattern presets, custom `A n x` beat grids, per-layer mixer gains, output device visibility, tap tempo, mute trainer, and tempo ramp controls.
+The app includes pattern presets, custom `A n x` beat grids, per-layer mixer gains, output device visibility, tap tempo, mute trainer, tempo ramp, and polyrhythm controls.
 
 ## Timing Contract
 

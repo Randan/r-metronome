@@ -5,6 +5,7 @@ public struct ClickEvent: Equatable, Sendable {
         case accent
         case normal
         case subdivision
+        case polyrhythm
     }
 
     public var sampleTime: Int64
@@ -38,23 +39,64 @@ public struct MetronomeScheduler: Sendable {
 
     public func events(from lowerBound: Int64, through upperBound: Int64) -> [ClickEvent] {
         guard state.isPlaying, upperBound >= lowerBound else { return [] }
+        let primaryEvents = scheduledEvents(
+            from: lowerBound,
+            through: upperBound,
+            pattern: state.pattern,
+            subdivision: state.subdivision,
+            outputLayerOverride: nil,
+            isMuted: isMuted(beatIndex:)
+        )
+
+        guard let polyrhythm = state.polyrhythm else { return primaryEvents }
+
+        let secondaryState = MetronomeState(
+            bpm: polyrhythm.bpm,
+            timeSignature: TimeSignature(beatsPerMeasure: polyrhythm.pattern.beats.count, beatUnit: state.timeSignature.beatUnit),
+            pattern: polyrhythm.pattern,
+            isPlaying: true
+        )
+        let secondaryScheduler = MetronomeScheduler(sampleRate: sampleRate, startSampleTime: startSampleTime, state: secondaryState)
+        let secondaryEvents = secondaryScheduler.scheduledEvents(
+            from: lowerBound,
+            through: upperBound,
+            pattern: polyrhythm.pattern,
+            subdivision: .none,
+            outputLayerOverride: .polyrhythm,
+            isMuted: { _ in false }
+        )
+
+        return (primaryEvents + secondaryEvents).sorted(by: eventSort)
+    }
+
+    private func scheduledEvents(
+        from lowerBound: Int64,
+        through upperBound: Int64,
+        pattern: Pattern,
+        subdivision: Subdivision,
+        outputLayerOverride: ClickEvent.Layer?,
+        isMuted: (Int64) -> Bool
+    ) -> [ClickEvent] {
 
         let firstBeat = max(0, beatIndex(atOrBefore: lowerBound) - 1)
         let lastBeat = max(0, beatIndex(atOrBefore: upperBound) + 2)
 
         var result: [ClickEvent] = []
         for beatIndex in firstBeat...lastBeat {
-            guard !isMuted(beatIndex: beatIndex) else { continue }
+            guard !isMuted(beatIndex) else { continue }
 
             let beatSample = sampleTime(forBeat: beatIndex)
             if beatSample >= lowerBound, beatSample <= upperBound {
-                if let event = beatEvent(beatIndex: beatIndex, sampleTime: beatSample) {
+                if var event = beatEvent(beatIndex: beatIndex, sampleTime: beatSample, pattern: pattern) {
+                    if let outputLayerOverride {
+                        event.layer = outputLayerOverride
+                    }
                     result.append(event)
                 }
             }
 
-            guard state.subdivision != .none else { continue }
-            let subdivisionCount = state.subdivision.rawValue
+            guard subdivision != .none else { continue }
+            let subdivisionCount = subdivision.rawValue
             for subdivisionIndex in 1..<subdivisionCount {
                 let offset = samplesPerBeat(forBeat: beatIndex) * Double(subdivisionIndex) / Double(subdivisionCount)
                 let subdivisionSample = beatSample + Int64(offset.rounded())
@@ -71,12 +113,7 @@ public struct MetronomeScheduler: Sendable {
             }
         }
 
-        return result.sorted { lhs, rhs in
-            if lhs.sampleTime == rhs.sampleTime {
-                return lhs.subdivisionIndex < rhs.subdivisionIndex
-            }
-            return lhs.sampleTime < rhs.sampleTime
-        }
+        return result.sorted(by: eventSort)
     }
 
     public func sampleTime(forBeat beatIndex: Int64) -> Int64 {
@@ -103,9 +140,9 @@ public struct MetronomeScheduler: Sendable {
         state.tempoRamp?.bpm(baseBPM: state.bpm, measureIndex: measureIndex) ?? state.bpm
     }
 
-    private func beatEvent(beatIndex: Int64, sampleTime: Int64) -> ClickEvent? {
-        let patternIndex = Int(beatIndex % Int64(state.pattern.beats.count))
-        switch state.pattern.beats[patternIndex].kind {
+    private func beatEvent(beatIndex: Int64, sampleTime: Int64, pattern: Pattern) -> ClickEvent? {
+        let patternIndex = Int(beatIndex % Int64(pattern.beats.count))
+        switch pattern.beats[patternIndex].kind {
         case .accent:
             return ClickEvent(sampleTime: sampleTime, beatIndex: beatIndex, subdivisionIndex: 0, layer: .accent)
         case .normal:
@@ -149,5 +186,28 @@ public struct MetronomeScheduler: Sendable {
         }
 
         return lower
+    }
+
+    private func eventSort(_ lhs: ClickEvent, _ rhs: ClickEvent) -> Bool {
+        if lhs.sampleTime == rhs.sampleTime {
+            if lhs.subdivisionIndex == rhs.subdivisionIndex {
+                return layerSortIndex(lhs.layer) < layerSortIndex(rhs.layer)
+            }
+            return lhs.subdivisionIndex < rhs.subdivisionIndex
+        }
+        return lhs.sampleTime < rhs.sampleTime
+    }
+
+    private func layerSortIndex(_ layer: ClickEvent.Layer) -> Int {
+        switch layer {
+        case .accent:
+            0
+        case .normal:
+            1
+        case .subdivision:
+            2
+        case .polyrhythm:
+            3
+        }
     }
 }

@@ -16,6 +16,7 @@ struct MetronomeView: View {
                 subdivisionControl
                 practiceControl
                 tempoRampControl
+                polyrhythmControl
                 mixerControl
                 deviceControl
                 transport
@@ -183,6 +184,37 @@ struct MetronomeView: View {
         }
     }
 
+    private var polyrhythmControl: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Toggle("Polyrhythm", isOn: $viewModel.polyrhythmEnabled)
+                .toggleStyle(.checkbox)
+                .onChange(of: viewModel.polyrhythmEnabled) { _, _ in viewModel.applyChangedTiming() }
+
+            HStack(spacing: 16) {
+                LabeledContent("BPM") {
+                    Stepper(value: $viewModel.polyrhythmBPM, in: 20...300, step: 1) {
+                        Text("\(Int(viewModel.polyrhythmBPM))")
+                            .monospacedDigit()
+                            .frame(width: 42, alignment: .trailing)
+                    }
+                    .onChange(of: viewModel.polyrhythmBPM) { _, _ in viewModel.applyChangedTiming() }
+                }
+
+                LabeledContent("Beats") {
+                    Stepper(value: $viewModel.polyrhythmBeats, in: 1...16, step: 1) {
+                        Text("\(viewModel.polyrhythmBeats)")
+                            .monospacedDigit()
+                            .frame(width: 32, alignment: .trailing)
+                    }
+                    .onChange(of: viewModel.polyrhythmBeats) { _, _ in viewModel.applyChangedTiming() }
+                }
+            }
+            .disabled(!viewModel.polyrhythmEnabled)
+            .foregroundStyle(viewModel.polyrhythmEnabled ? .primary : .secondary)
+        }
+    }
+
+
     private var mixerControl: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Mixer")
@@ -191,6 +223,7 @@ struct MetronomeView: View {
             gainSlider("Accent", value: $viewModel.accentGain)
             gainSlider("Normal", value: $viewModel.normalGain)
             gainSlider("Subdivision", value: $viewModel.subdivisionGain)
+            gainSlider("Polyrhythm", value: $viewModel.polyrhythmGain)
         }
     }
 
@@ -261,9 +294,13 @@ struct MetronomeView: View {
                 viewModel.rampStep = 5
                 viewModel.rampEveryMeasures = 4
                 viewModel.rampMaximumBPM = 180
+                viewModel.polyrhythmEnabled = false
+                viewModel.polyrhythmBPM = 180
+                viewModel.polyrhythmBeats = 3
                 viewModel.accentGain = 1.0
                 viewModel.normalGain = 0.8
                 viewModel.subdivisionGain = 0.6
+                viewModel.polyrhythmGain = 0.7
                 viewModel.applyChangedTiming()
             } label: {
                 Label("Reset", systemImage: "arrow.counterclockwise")

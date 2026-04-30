@@ -40,6 +40,8 @@ public struct OutputRouting: Equatable, Sendable {
             normal
         case .subdivision:
             subdivision
+        case .polyrhythm:
+            polyrhythm ?? .stereoMain
         }
     }
 }

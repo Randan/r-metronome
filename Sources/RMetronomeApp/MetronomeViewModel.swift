@@ -16,9 +16,13 @@ final class MetronomeViewModel {
     var rampStep: Double = 5
     var rampEveryMeasures: Int = 4
     var rampMaximumBPM: Double = 180
+    var polyrhythmEnabled = false
+    var polyrhythmBPM: Double = 180
+    var polyrhythmBeats: Int = 3
     var accentGain: Double = 1.0
     var normalGain: Double = 0.8
     var subdivisionGain: Double = 0.6
+    var polyrhythmGain: Double = 0.7
     var outputDevices: [String] = []
     var isPlaying = false
     var status = "Ready"
@@ -161,10 +165,15 @@ final class MetronomeViewModel {
                 everyMeasures: rampEveryMeasures,
                 maximumBPM: rampMaximumBPM
             ) : nil,
+            polyrhythm: polyrhythmEnabled ? .regular(
+                bpm: polyrhythmBPM,
+                beats: polyrhythmBeats
+            ) : nil,
             layerGains: LayerGains(
                 accent: Float(accentGain),
                 normal: Float(normalGain),
-                subdivision: Float(subdivisionGain)
+                subdivision: Float(subdivisionGain),
+                polyrhythm: Float(polyrhythmGain)
             ),
             isPlaying: isPlaying
         )
