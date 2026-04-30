@@ -1,6 +1,6 @@
 import Foundation
 
-public struct TempoRamp: Equatable, Sendable {
+public struct TempoRamp: Codable, Equatable, Sendable {
     public var bpmStep: Double
     public var everyMeasures: Int
     public var maximumBPM: Double?
@@ -31,7 +31,7 @@ public struct TempoRamp: Equatable, Sendable {
     }
 }
 
-public struct MuteTrainer: Equatable, Sendable {
+public struct MuteTrainer: Codable, Equatable, Sendable {
     public var mutedMeasures: Set<Int>
     public var cycleLengthMeasures: Int?
 

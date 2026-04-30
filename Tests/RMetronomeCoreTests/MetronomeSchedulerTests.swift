@@ -207,4 +207,24 @@ final class MetronomeSchedulerTests: XCTestCase {
         XCTAssertEqual(ramp.bpm(baseBPM: 70, measureIndex: 1), 90)
         XCTAssertEqual(ramp.bpm(baseBPM: 70, measureIndex: 2), 90)
     }
+
+    func testMetronomeSessionRoundTripsThroughJSON() throws {
+        let state = MetronomeState(
+            bpm: 135,
+            timeSignature: TimeSignature(beatsPerMeasure: 7, beatUnit: 8),
+            pattern: try Pattern.grouped([3, 2, 2]),
+            subdivision: .triplets,
+            muteTrainer: .everyOtherMeasure,
+            tempoRamp: TempoRamp(bpmStep: 5, everyMeasures: 4, maximumBPM: 160),
+            polyrhythm: .regular(bpm: 180, beats: 3),
+            layerGains: LayerGains(accent: 0.9, normal: 0.7, subdivision: 0.4, polyrhythm: 0.6),
+            isPlaying: true
+        )
+        let session = MetronomeSession(state: state)
+
+        let decoded = try MetronomeSession.decode(from: session.jsonData())
+
+        XCTAssertEqual(decoded.version, 1)
+        XCTAssertEqual(decoded.state, state)
+    }
 }

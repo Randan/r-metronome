@@ -1,6 +1,6 @@
 import Foundation
 
-public struct PolyrhythmSettings: Equatable, Sendable {
+public struct PolyrhythmSettings: Codable, Equatable, Sendable {
     public var bpm: Double
     public var pattern: Pattern
 

@@ -59,6 +59,13 @@ Inspect scheduled events without audio:
 swift run r-metronome --dry-run --duration 4
 ```
 
+Save or load a portable session JSON:
+
+```bash
+swift run r-metronome --preset clave --poly-bpm 180 --save-config clave-session.json --dry-run
+swift run r-metronome --config clave-session.json --duration 20
+```
+
 With mute trainer:
 
 ```bash

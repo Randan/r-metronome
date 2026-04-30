@@ -1,7 +1,7 @@
 import Foundation
 
-public struct Beat: Equatable, Sendable {
-    public enum Kind: Equatable, Sendable {
+public struct Beat: Codable, Equatable, Sendable {
+    public enum Kind: Codable, Equatable, Sendable {
         case accent
         case normal
         case mute
@@ -17,7 +17,7 @@ public struct Beat: Equatable, Sendable {
     }
 }
 
-public struct Pattern: Equatable, Sendable {
+public struct Pattern: Codable, Equatable, Sendable {
     public var beats: [Beat]
     public var grouping: [Int]
 

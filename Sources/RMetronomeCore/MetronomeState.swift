@@ -1,6 +1,6 @@
 import Foundation
 
-public struct MetronomeState: Equatable, Sendable {
+public struct MetronomeState: Codable, Equatable, Sendable {
     public var bpm: Double
     public var timeSignature: TimeSignature
     public var pattern: Pattern
@@ -35,7 +35,7 @@ public struct MetronomeState: Equatable, Sendable {
     }
 }
 
-public struct LayerGains: Equatable, Sendable {
+public struct LayerGains: Codable, Equatable, Sendable {
     public var accent: Float
     public var normal: Float
     public var subdivision: Float
@@ -55,7 +55,7 @@ public struct LayerGains: Equatable, Sendable {
     }
 }
 
-public struct TimeSignature: Equatable, Sendable {
+public struct TimeSignature: Codable, Equatable, Sendable {
     public var beatsPerMeasure: Int
     public var beatUnit: Int
 
@@ -92,7 +92,7 @@ public extension MetronomeState {
     }
 }
 
-public enum Subdivision: Int, Equatable, Sendable {
+public enum Subdivision: Int, Codable, Equatable, Sendable {
     case none = 1
     case eighths = 2
     case triplets = 3

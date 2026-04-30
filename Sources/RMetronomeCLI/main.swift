@@ -24,6 +24,8 @@ struct CLIOptions {
     var listDevices = false
     var listPresets = false
     var dryRun = false
+    var configPath: String?
+    var saveConfigPath: String?
 }
 
 enum CLIError: Error, CustomStringConvertible {
@@ -61,28 +63,13 @@ struct RMetronomeCLI {
     }
 
     private static func run(options: CLIOptions) throws {
-        let pattern = try makePattern(options: options)
-        let beatUnit = options.preset?.beatUnit ?? options.beatUnit
-        let state = MetronomeState(
-            bpm: options.bpm,
-            timeSignature: TimeSignature(beatsPerMeasure: pattern.beats.count, beatUnit: beatUnit),
-            pattern: pattern,
-            subdivision: options.subdivision,
-            muteTrainer: options.muteEveryOtherMeasure ? .everyOtherMeasure : nil,
-            tempoRamp: options.rampStep.map {
-                TempoRamp(bpmStep: $0, everyMeasures: options.rampEveryMeasures, maximumBPM: options.rampMaximumBPM)
-            },
-            polyrhythm: options.polyrhythmBPM.map {
-                PolyrhythmSettings.regular(bpm: $0, beats: options.polyrhythmBeats)
-            },
-            layerGains: LayerGains(
-                accent: options.accentGain,
-                normal: options.normalGain,
-                subdivision: options.subdivisionGain,
-                polyrhythm: options.polyrhythmGain
-            ),
-            isPlaying: true
-        )
+        var state = try makeState(options: options)
+        state.isPlaying = true
+
+        if let saveConfigPath = options.saveConfigPath {
+            try saveSession(state: state, path: saveConfigPath)
+            print("saved session: \(saveConfigPath)")
+        }
 
         if options.dryRun {
             printDryRun(state: state, sampleRate: options.sampleRate, duration: options.duration)
@@ -94,12 +81,12 @@ struct RMetronomeCLI {
         )
         try transport.start(state: state)
 
-        let meterLabel = "\(pattern.beats.count)/\(beatUnit)"
-        let groupingLabel = pattern.grouping.isEmpty ? "" : " grouping \(pattern.grouping.map(String.init).joined(separator: "+")),"
+        let meterLabel = "\(state.timeSignature.beatsPerMeasure)/\(state.timeSignature.beatUnit)"
+        let groupingLabel = state.pattern.grouping.isEmpty ? "" : " grouping \(state.pattern.grouping.map(String.init).joined(separator: "+")),"
         let muteLabel = options.muteEveryOtherMeasure ? " mute every other measure," : ""
         let rampLabel = options.rampStep.map { " ramp \($0 >= 0 ? "+" : "")\(String(format: "%.1f", $0)) BPM every \(options.rampEveryMeasures) measures," } ?? ""
         let polyLabel = options.polyrhythmBPM.map { " poly \(Int($0.rounded())) BPM/\(options.polyrhythmBeats) beats," } ?? ""
-        print("r-metronome: \(Int(options.bpm)) BPM, \(meterLabel),\(groupingLabel)\(muteLabel)\(rampLabel)\(polyLabel) \(String(format: "%.1f", options.duration))s")
+        print("r-metronome: \(Int(state.bpm.rounded())) BPM, \(meterLabel),\(groupingLabel)\(muteLabel)\(rampLabel)\(polyLabel) \(String(format: "%.1f", options.duration))s")
         print("transport lookahead: 1.5s")
 
         Thread.sleep(forTimeInterval: options.duration + 0.2)
@@ -152,6 +139,10 @@ struct RMetronomeCLI {
                 options.listPresets = true
             case "--dry-run":
                 options.dryRun = true
+            case "--config":
+                options.configPath = try readString(arguments, &index, option: argument)
+            case "--save-config":
+                options.saveConfigPath = try readString(arguments, &index, option: argument)
             case "--bpm":
                 options.bpm = try readDouble(arguments, &index, option: argument)
             case "--duration":
@@ -288,6 +279,41 @@ struct RMetronomeCLI {
         return Pattern.regular(beatsPerMeasure: options.beatsPerMeasure)
     }
 
+    private static func makeState(options: CLIOptions) throws -> MetronomeState {
+        if let configPath = options.configPath {
+            let data = try Data(contentsOf: URL(fileURLWithPath: configPath))
+            return try MetronomeSession.decode(from: data).state
+        }
+
+        let pattern = try makePattern(options: options)
+        let beatUnit = options.preset?.beatUnit ?? options.beatUnit
+        return MetronomeState(
+            bpm: options.bpm,
+            timeSignature: TimeSignature(beatsPerMeasure: pattern.beats.count, beatUnit: beatUnit),
+            pattern: pattern,
+            subdivision: options.subdivision,
+            muteTrainer: options.muteEveryOtherMeasure ? .everyOtherMeasure : nil,
+            tempoRamp: options.rampStep.map {
+                TempoRamp(bpmStep: $0, everyMeasures: options.rampEveryMeasures, maximumBPM: options.rampMaximumBPM)
+            },
+            polyrhythm: options.polyrhythmBPM.map {
+                PolyrhythmSettings.regular(bpm: $0, beats: options.polyrhythmBeats)
+            },
+            layerGains: LayerGains(
+                accent: options.accentGain,
+                normal: options.normalGain,
+                subdivision: options.subdivisionGain,
+                polyrhythm: options.polyrhythmGain
+            ),
+            isPlaying: true
+        )
+    }
+
+    private static func saveSession(state: MetronomeState, path: String) throws {
+        let session = MetronomeSession(state: state)
+        try session.jsonData().write(to: URL(fileURLWithPath: path), options: .atomic)
+    }
+
     private static func helpText() -> String {
         """
         Usage:
@@ -316,6 +342,8 @@ struct RMetronomeCLI {
           --list-devices              Print CoreAudio output devices
           --list-presets              Print built-in presets
           --dry-run                   Print scheduled events without starting audio
+          --config <path>             Load session JSON
+          --save-config <path>        Save session JSON before running
           --help                      Show this help
         """
     }

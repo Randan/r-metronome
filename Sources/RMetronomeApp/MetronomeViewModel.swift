@@ -29,6 +29,11 @@ final class MetronomeViewModel {
 
     private let transport = MetronomeTransport()
     private var tapTimes: [Date] = []
+    private let settingsKey = "r-metronome.settings.v1"
+
+    init() {
+        loadSettings()
+    }
 
     func togglePlayback() {
         if isPlaying {
@@ -42,6 +47,7 @@ final class MetronomeViewModel {
         stop()
 
         do {
+            saveSettings()
             try transport.start(state: try makeState(isPlaying: true))
             isPlaying = true
             status = "Playing \(Int(bpm)) BPM"
@@ -58,6 +64,7 @@ final class MetronomeViewModel {
     }
 
     func applyChangedTiming() {
+        saveSettings()
         guard isPlaying else { return }
         do {
             transport.update(state: try makeState(isPlaying: true))
@@ -139,6 +146,61 @@ final class MetronomeViewModel {
         }
     }
 
+    private func loadSettings() {
+        guard
+            let data = UserDefaults.standard.data(forKey: settingsKey),
+            let settings = try? JSONDecoder().decode(AppSettings.self, from: data)
+        else {
+            return
+        }
+
+        bpm = settings.bpm
+        beatsPerMeasure = settings.beatsPerMeasure
+        beatUnit = settings.beatUnit
+        groupingText = settings.groupingText
+        patternText = settings.patternText
+        subdivision = settings.subdivision
+        muteEveryOtherMeasure = settings.muteEveryOtherMeasure
+        tempoRampEnabled = settings.tempoRampEnabled
+        rampStep = settings.rampStep
+        rampEveryMeasures = settings.rampEveryMeasures
+        rampMaximumBPM = settings.rampMaximumBPM
+        polyrhythmEnabled = settings.polyrhythmEnabled
+        polyrhythmBPM = settings.polyrhythmBPM
+        polyrhythmBeats = settings.polyrhythmBeats
+        accentGain = settings.accentGain
+        normalGain = settings.normalGain
+        subdivisionGain = settings.subdivisionGain
+        polyrhythmGain = settings.polyrhythmGain
+    }
+
+    private func saveSettings() {
+        let settings = AppSettings(
+            bpm: bpm,
+            beatsPerMeasure: beatsPerMeasure,
+            beatUnit: beatUnit,
+            groupingText: groupingText,
+            patternText: patternText,
+            subdivision: subdivision,
+            muteEveryOtherMeasure: muteEveryOtherMeasure,
+            tempoRampEnabled: tempoRampEnabled,
+            rampStep: rampStep,
+            rampEveryMeasures: rampEveryMeasures,
+            rampMaximumBPM: rampMaximumBPM,
+            polyrhythmEnabled: polyrhythmEnabled,
+            polyrhythmBPM: polyrhythmBPM,
+            polyrhythmBeats: polyrhythmBeats,
+            accentGain: accentGain,
+            normalGain: normalGain,
+            subdivisionGain: subdivisionGain,
+            polyrhythmGain: polyrhythmGain
+        )
+
+        if let data = try? JSONEncoder().encode(settings) {
+            UserDefaults.standard.set(data, forKey: settingsKey)
+        }
+    }
+
     private func makePattern() throws -> Pattern {
         let trimmedPattern = patternText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmedPattern.isEmpty {
@@ -178,4 +240,25 @@ final class MetronomeViewModel {
             isPlaying: isPlaying
         )
     }
+}
+
+private struct AppSettings: Codable {
+    var bpm: Double
+    var beatsPerMeasure: Int
+    var beatUnit: Int
+    var groupingText: String
+    var patternText: String
+    var subdivision: Subdivision
+    var muteEveryOtherMeasure: Bool
+    var tempoRampEnabled: Bool
+    var rampStep: Double
+    var rampEveryMeasures: Int
+    var rampMaximumBPM: Double
+    var polyrhythmEnabled: Bool
+    var polyrhythmBPM: Double
+    var polyrhythmBeats: Int
+    var accentGain: Double
+    var normalGain: Double
+    var subdivisionGain: Double
+    var polyrhythmGain: Double
 }
