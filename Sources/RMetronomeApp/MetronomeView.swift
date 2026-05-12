@@ -91,8 +91,13 @@ struct MetronomeView: View {
 
     private var pendulumPanel: some View {
         section("Pendulum") {
-            PendulumIndicator(bpm: viewModel.bpm, isPlaying: viewModel.isPlaying)
-                .frame(height: 96)
+            MovingBeatIndicator(
+                bpm: viewModel.bpm,
+                polyrhythmBPM: viewModel.polyrhythmBPM,
+                showsPolyrhythm: viewModel.polyrhythmEnabled,
+                isPlaying: viewModel.isPlaying
+            )
+                .frame(height: viewModel.polyrhythmEnabled ? 86 : 42)
                 .frame(maxWidth: .infinity)
         }
     }
@@ -370,39 +375,38 @@ struct MetronomeView: View {
     }
 }
 
-private struct PendulumIndicator: View {
+private struct MovingBeatIndicator: View {
     var bpm: Double
+    var polyrhythmBPM: Double
+    var showsPolyrhythm: Bool
     var isPlaying: Bool
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            let beatDuration = 60.0 / max(bpm, 1)
-            let phase = isPlaying ? timeline.date.timeIntervalSinceReferenceDate / beatDuration : 0
-            let swing = sin(phase * .pi * 2.0)
-            let flash = isPlaying && abs(swing) > 0.94
+            VStack(spacing: 12) {
+                movingSquare(color: .blue, bpm: bpm, date: timeline.date)
 
-            ZStack(alignment: .top) {
-                Capsule()
-                    .fill(Color.secondary.opacity(0.18))
-                    .frame(width: 3, height: 68)
-                    .rotationEffect(.degrees(swing * 28), anchor: .top)
-                    .animation(.linear(duration: 0.03), value: swing)
-
-                Circle()
-                    .fill(flash ? Color.accentColor : Color.secondary.opacity(0.42))
-                    .frame(width: 18, height: 18)
-                    .offset(x: swing * 96, y: 62)
-                    .shadow(color: flash ? Color.accentColor.opacity(0.55) : .clear, radius: 10)
-
-                HStack {
-                    Circle().fill(Color.secondary.opacity(0.25)).frame(width: 8, height: 8)
-                    Spacer()
-                    Circle().fill(Color.secondary.opacity(0.25)).frame(width: 8, height: 8)
+                if showsPolyrhythm {
+                    movingSquare(color: .red, bpm: polyrhythmBPM, date: timeline.date)
                 }
-                .padding(.horizontal, 72)
-                .offset(y: 68)
             }
         }
+    }
+
+    private func movingSquare(color: Color, bpm: Double, date: Date) -> some View {
+        GeometryReader { geometry in
+            let size = 30.0
+            let travel = max(0, geometry.size.width - size)
+            let beatDuration = 60.0 / max(bpm, 1)
+            let phase = isPlaying ? date.timeIntervalSinceReferenceDate / beatDuration : 0
+            let position = (sin(phase * .pi * 2.0 - .pi / 2.0) + 1.0) / 2.0
+
+            RoundedRectangle(cornerRadius: 4)
+                .fill(color)
+                .frame(width: size, height: size)
+                .offset(x: travel * position)
+        }
+        .frame(height: 30)
     }
 }
 
