@@ -22,6 +22,7 @@ struct MetronomeView: View {
                 transport
             }
             .padding(28)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear { viewModel.refreshDevices() }
