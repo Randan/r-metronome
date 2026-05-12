@@ -84,6 +84,12 @@ With a secondary polyrhythm layer:
 swift run r-metronome --bpm 120 --poly-bpm 180 --poly-beats 3 --duration 20
 ```
 
+With true 3-over-4 polyrhythm:
+
+```bash
+swift run r-metronome --bpm 120 --poly-over 3 --duration 20
+```
+
 With mixer gains:
 
 ```bash

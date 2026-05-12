@@ -165,6 +165,24 @@ final class MetronomeSchedulerTests: XCTestCase {
         XCTAssertEqual(state.summary, "120 BPM, 4/4, A n n n, poly 180 BPM")
     }
 
+    func testPolyrhythmCanLockToPrimaryMeasure() {
+        let state = MetronomeState(
+            bpm: 60,
+            timeSignature: TimeSignature(beatsPerMeasure: 4, beatUnit: 4),
+            pattern: .regular(beatsPerMeasure: 4),
+            polyrhythm: .overPrimaryMeasure(beats: 3),
+            isPlaying: true
+        )
+        let scheduler = MetronomeScheduler(sampleRate: 1_000, startSampleTime: 0, state: state)
+
+        let polyrhythmEvents = scheduler
+            .events(from: 0, through: 4_000)
+            .filter { $0.layer == .polyrhythm }
+
+        XCTAssertEqual(polyrhythmEvents.map(\.sampleTime), [0, 1_333, 2_667, 4_000])
+        XCTAssertEqual(state.summary, "60 BPM, 4/4, A n n n, poly 3 over 4")
+    }
+
     func testMuteTrainerSkipsEventsWithoutStoppingTransport() {
         let state = MetronomeState(
             bpm: 60,

@@ -88,7 +88,11 @@ public extension MetronomeState {
             parts.append("ramp \(tempoRamp.summary)")
         }
         if let polyrhythm {
-            parts.append("poly \(Int(polyrhythm.bpm.rounded())) BPM")
+            if polyrhythm.locksToPrimaryMeasure {
+                parts.append("poly \(polyrhythm.pattern.beats.count) over \(timeSignature.beatsPerMeasure)")
+            } else {
+                parts.append("poly \(Int(polyrhythm.bpm.rounded())) BPM")
+            }
         }
 
         return parts.joined(separator: ", ")

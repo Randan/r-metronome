@@ -17,6 +17,7 @@ struct CLIOptions {
     var rampMaximumBPM: Double?
     var polyrhythmBPM: Double?
     var polyrhythmBeats = 3
+    var polyrhythmOverBeats: Int?
     var accentGain: Float = 1.0
     var normalGain: Float = 0.8
     var subdivisionGain: Float = 0.6
@@ -85,7 +86,9 @@ struct RMetronomeCLI {
         let groupingLabel = state.pattern.grouping.isEmpty ? "" : " grouping \(state.pattern.grouping.map(String.init).joined(separator: "+")),"
         let muteLabel = options.muteEveryOtherMeasure ? " mute every other measure," : ""
         let rampLabel = options.rampStep.map { " ramp \($0 >= 0 ? "+" : "")\(String(format: "%.1f", $0)) BPM every \(options.rampEveryMeasures) measures," } ?? ""
-        let polyLabel = options.polyrhythmBPM.map { " poly \(Int($0.rounded())) BPM/\(options.polyrhythmBeats) beats," } ?? ""
+        let polyLabel = options.polyrhythmOverBeats.map { " poly \($0) over \(state.timeSignature.beatsPerMeasure)," }
+            ?? options.polyrhythmBPM.map { " poly \(Int($0.rounded())) BPM/\(options.polyrhythmBeats) beats," }
+            ?? ""
         print("r-metronome: \(Int(state.bpm.rounded())) BPM, \(meterLabel),\(groupingLabel)\(muteLabel)\(rampLabel)\(polyLabel) \(String(format: "%.1f", options.duration))s")
         print("transport lookahead: 1.5s")
 
@@ -176,6 +179,8 @@ struct RMetronomeCLI {
                 options.polyrhythmBPM = try readDouble(arguments, &index, option: argument)
             case "--poly-beats":
                 options.polyrhythmBeats = try readInt(arguments, &index, option: argument)
+            case "--poly-over":
+                options.polyrhythmOverBeats = try readInt(arguments, &index, option: argument)
             case "--accent-gain":
                 options.accentGain = try readFloat(arguments, &index, option: argument)
             case "--normal-gain":
@@ -200,6 +205,9 @@ struct RMetronomeCLI {
             guard polyrhythmBPM > 0 else { throw CLIError.invalidValue("--poly-bpm", "\(polyrhythmBPM)") }
         }
         guard options.polyrhythmBeats > 0 else { throw CLIError.invalidValue("--poly-beats", "\(options.polyrhythmBeats)") }
+        if let polyrhythmOverBeats = options.polyrhythmOverBeats {
+            guard polyrhythmOverBeats > 0 else { throw CLIError.invalidValue("--poly-over", "\(polyrhythmOverBeats)") }
+        }
         guard (0...1).contains(options.accentGain) else { throw CLIError.invalidValue("--accent-gain", "\(options.accentGain)") }
         guard (0...1).contains(options.normalGain) else { throw CLIError.invalidValue("--normal-gain", "\(options.normalGain)") }
         guard (0...1).contains(options.subdivisionGain) else { throw CLIError.invalidValue("--subdivision-gain", "\(options.subdivisionGain)") }
@@ -296,9 +304,7 @@ struct RMetronomeCLI {
             tempoRamp: options.rampStep.map {
                 TempoRamp(bpmStep: $0, everyMeasures: options.rampEveryMeasures, maximumBPM: options.rampMaximumBPM)
             },
-            polyrhythm: options.polyrhythmBPM.map {
-                PolyrhythmSettings.regular(bpm: $0, beats: options.polyrhythmBeats)
-            },
+            polyrhythm: makePolyrhythm(options: options),
             layerGains: LayerGains(
                 accent: options.accentGain,
                 normal: options.normalGain,
@@ -312,6 +318,15 @@ struct RMetronomeCLI {
     private static func saveSession(state: MetronomeState, path: String) throws {
         let session = MetronomeSession(state: state)
         try session.jsonData().write(to: URL(fileURLWithPath: path), options: .atomic)
+    }
+
+    private static func makePolyrhythm(options: CLIOptions) -> PolyrhythmSettings? {
+        if let polyrhythmOverBeats = options.polyrhythmOverBeats {
+            return .overPrimaryMeasure(beats: polyrhythmOverBeats)
+        }
+        return options.polyrhythmBPM.map {
+            PolyrhythmSettings.regular(bpm: $0, beats: options.polyrhythmBeats)
+        }
     }
 
     private static func helpText() -> String {
@@ -333,6 +348,7 @@ struct RMetronomeCLI {
           --ramp-max <bpm>            Optional maximum BPM for upward ramps
           --poly-bpm <number>         Enable a synchronized secondary rhythm
           --poly-beats <count>        Secondary pattern length. Default: 3
+          --poly-over <count>         True polyrhythm: N beats over one primary measure
           --accent-gain <0...1>       Accent volume. Default: 1.0
           --normal-gain <0...1>       Normal volume. Default: 0.8
           --subdivision-gain <0...1>  Subdivision volume. Default: 0.6

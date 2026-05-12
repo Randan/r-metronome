@@ -50,6 +50,11 @@ public struct MetronomeScheduler: Sendable {
 
         guard let polyrhythm = state.polyrhythm else { return primaryEvents }
 
+        if polyrhythm.locksToPrimaryMeasure {
+            return (primaryEvents + lockedPolyrhythmEvents(from: lowerBound, through: upperBound, settings: polyrhythm))
+                .sorted(by: eventSort)
+        }
+
         let secondaryState = MetronomeState(
             bpm: polyrhythm.bpm,
             timeSignature: TimeSignature(beatsPerMeasure: polyrhythm.pattern.beats.count, beatUnit: state.timeSignature.beatUnit),
@@ -67,6 +72,41 @@ public struct MetronomeScheduler: Sendable {
         )
 
         return (primaryEvents + secondaryEvents).sorted(by: eventSort)
+    }
+
+    private func lockedPolyrhythmEvents(
+        from lowerBound: Int64,
+        through upperBound: Int64,
+        settings: PolyrhythmSettings
+    ) -> [ClickEvent] {
+        let primaryBeatsPerMeasure = Int64(state.pattern.beats.count)
+        let polyrhythmBeats = settings.pattern.beats.count
+        let firstMeasure = max(0, Int(beatIndex(atOrBefore: lowerBound) / primaryBeatsPerMeasure) - 1)
+        let lastMeasure = max(0, Int(beatIndex(atOrBefore: upperBound) / primaryBeatsPerMeasure) + 2)
+
+        var result: [ClickEvent] = []
+        for measureIndex in firstMeasure...lastMeasure {
+            let measureStart = sampleTime(forBeat: Int64(measureIndex) * primaryBeatsPerMeasure)
+            let measureEnd = sampleTime(forBeat: Int64(measureIndex + 1) * primaryBeatsPerMeasure)
+            let measureDuration = measureEnd - measureStart
+
+            for polyrhythmIndex in 0..<polyrhythmBeats {
+                let offset = Double(measureDuration) * Double(polyrhythmIndex) / Double(polyrhythmBeats)
+                let sampleTime = measureStart + Int64(offset.rounded())
+                if sampleTime >= lowerBound, sampleTime <= upperBound {
+                    result.append(
+                        ClickEvent(
+                            sampleTime: sampleTime,
+                            beatIndex: Int64(measureIndex * polyrhythmBeats + polyrhythmIndex),
+                            subdivisionIndex: polyrhythmIndex,
+                            layer: .polyrhythm
+                        )
+                    )
+                }
+            }
+        }
+
+        return result
     }
 
     private func scheduledEvents(

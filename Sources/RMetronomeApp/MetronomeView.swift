@@ -93,7 +93,7 @@ struct MetronomeView: View {
         section("Pendulum") {
             MovingBeatIndicator(
                 bpm: viewModel.bpm,
-                polyrhythmBPM: viewModel.polyrhythmBPM,
+                polyrhythmBPM: viewModel.polyrhythmDisplayBPM,
                 showsPolyrhythm: viewModel.polyrhythmEnabled,
                 isPlaying: viewModel.isPlaying
             )
@@ -192,8 +192,10 @@ struct MetronomeView: View {
                 }
 
                 HStack(spacing: 14) {
-                    smallStepper("BPM", value: $viewModel.polyrhythmBPM, range: 20...300)
-                    smallStepper("Beats", value: $viewModel.polyrhythmBeats, range: 1...16)
+                    smallStepper("Beats over measure", value: $viewModel.polyrhythmBeats, range: 1...16)
+                    Text("\(viewModel.polyrhythmBeats) over \(viewModel.beatsPerMeasure)")
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
                     Spacer()
                 }
                 .padding(.leading, 116)

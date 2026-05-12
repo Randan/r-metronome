@@ -163,6 +163,10 @@ final class MetronomeViewModel {
         selectedDevice?.channelPairs ?? [.stereoMain]
     }
 
+    var polyrhythmDisplayBPM: Double {
+        bpm * Double(polyrhythmBeats) / Double(max(beatsPerMeasure, 1))
+    }
+
     func selectOutputDevice(_ deviceID: UInt32?) {
         selectedOutputDeviceID = deviceID
         if let selectedDevice {
@@ -269,10 +273,7 @@ final class MetronomeViewModel {
                 everyMeasures: rampEveryMeasures,
                 maximumBPM: rampMaximumBPM
             ) : nil,
-            polyrhythm: polyrhythmEnabled ? .regular(
-                bpm: polyrhythmBPM,
-                beats: polyrhythmBeats
-            ) : nil,
+            polyrhythm: polyrhythmEnabled ? .overPrimaryMeasure(beats: polyrhythmBeats) : nil,
             layerGains: LayerGains(
                 accent: Float(accentGain),
                 normal: Float(normalGain),
