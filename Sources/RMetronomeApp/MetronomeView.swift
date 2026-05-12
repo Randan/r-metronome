@@ -105,13 +105,26 @@ struct MetronomeView: View {
                 BeatIndicator(
                     mode: viewModel.pendulumMode,
                     bpm: viewModel.bpm,
+                    beatsPerMeasure: viewModel.beatsPerMeasure,
                     polyrhythmBPM: viewModel.polyrhythmDisplayBPM,
+                    polyrhythmBeats: viewModel.polyrhythmBeats,
                     showsPolyrhythm: viewModel.polyrhythmEnabled,
                     isPlaying: viewModel.isPlaying
                 )
-                .frame(height: viewModel.pendulumMode == .blink ? 80 : (viewModel.polyrhythmEnabled ? 86 : 42))
+                .frame(height: indicatorHeight)
                 .frame(maxWidth: .infinity)
             }
+        }
+    }
+
+    private var indicatorHeight: CGFloat {
+        switch viewModel.pendulumMode {
+        case .swing:
+            viewModel.polyrhythmEnabled ? 86 : 42
+        case .blink:
+            80
+        case .clock:
+            300
         }
     }
 
@@ -394,7 +407,9 @@ struct MetronomeView: View {
 private struct BeatIndicator: View {
     var mode: PendulumMode
     var bpm: Double
+    var beatsPerMeasure: Int
     var polyrhythmBPM: Double
+    var polyrhythmBeats: Int
     var showsPolyrhythm: Bool
     var isPlaying: Bool
 
@@ -418,6 +433,8 @@ private struct BeatIndicator: View {
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 6))
+            case .clock:
+                clockFace(date: timeline.date)
             }
         }
     }
@@ -447,6 +464,107 @@ private struct BeatIndicator: View {
         return Rectangle()
             .fill(color.opacity(intensity))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func clockFace(date: Date) -> some View {
+        GeometryReader { geometry in
+            let size = min(geometry.size.width, geometry.size.height)
+            let center = CGPoint(x: geometry.size.width / 2.0, y: geometry.size.height / 2.0)
+            let outerRadius = size * 0.42
+            let innerRadius = size * 0.27
+            let measureDuration = 60.0 / max(bpm, 1) * Double(max(beatsPerMeasure, 1))
+            let phase = isPlaying ? date.timeIntervalSinceReferenceDate / measureDuration : 0
+            let angle = phase * .pi * 2.0 - .pi / 2.0
+            let handEnd = CGPoint(
+                x: center.x + cos(angle) * outerRadius,
+                y: center.y + sin(angle) * outerRadius
+            )
+
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.82), lineWidth: 2)
+                    .frame(width: outerRadius * 2.0, height: outerRadius * 2.0)
+                    .position(center)
+
+                if showsPolyrhythm {
+                    Circle()
+                        .stroke(Color.white.opacity(0.7), lineWidth: 2)
+                        .frame(width: innerRadius * 2.0, height: innerRadius * 2.0)
+                        .position(center)
+                }
+
+                ForEach(0..<max(beatsPerMeasure, 1), id: \.self) { index in
+                    clockDot(
+                        index: index,
+                        count: max(beatsPerMeasure, 1),
+                        radius: outerRadius,
+                        center: center,
+                        color: .blue,
+                        date: date,
+                        bpm: bpm
+                    )
+                }
+
+                if showsPolyrhythm {
+                    ForEach(0..<max(polyrhythmBeats, 1), id: \.self) { index in
+                        clockDot(
+                            index: index,
+                            count: max(polyrhythmBeats, 1),
+                            radius: innerRadius,
+                            center: center,
+                            color: .red,
+                            date: date,
+                            bpm: polyrhythmBPM
+                        )
+                    }
+                }
+
+                Path { path in
+                    path.move(to: center)
+                    path.addLine(to: handEnd)
+                }
+                .stroke(Color.white, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 7, height: 7)
+                    .position(center)
+            }
+        }
+    }
+
+    private func clockDot(
+        index: Int,
+        count: Int,
+        radius: Double,
+        center: CGPoint,
+        color: Color,
+        date: Date,
+        bpm: Double
+    ) -> some View {
+        let dotAngle = Double(index) / Double(max(count, 1)) * .pi * 2.0 - .pi / 2.0
+        let point = CGPoint(
+            x: center.x + cos(dotAngle) * radius,
+            y: center.y + sin(dotAngle) * radius
+        )
+        let beatDuration = 60.0 / max(bpm, 1)
+        let phase = isPlaying ? date.timeIntervalSinceReferenceDate / beatDuration : 0
+        let activeIndex = Int(floor(phase)).modulo(max(count, 1))
+        let active = isPlaying && activeIndex == index
+
+        return Circle()
+            .fill(color)
+            .frame(width: active ? 26 : 16, height: active ? 26 : 16)
+            .shadow(color: active ? color.opacity(0.65) : .clear, radius: 8)
+            .position(point)
+    }
+}
+
+private extension Int {
+    func modulo(_ divisor: Int) -> Int {
+        guard divisor > 0 else { return 0 }
+        let remainder = self % divisor
+        return remainder >= 0 ? remainder : remainder + divisor
     }
 }
 

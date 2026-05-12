@@ -319,6 +319,7 @@ private struct AppSettings: Codable {
 enum PendulumMode: String, Codable, CaseIterable {
     case swing
     case blink
+    case clock
 
     var title: String {
         switch self {
@@ -326,6 +327,8 @@ enum PendulumMode: String, Codable, CaseIterable {
             "Swing"
         case .blink:
             "Blink"
+        case .clock:
+            "Clock"
         }
     }
 }
