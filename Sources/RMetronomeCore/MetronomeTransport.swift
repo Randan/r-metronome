@@ -35,7 +35,11 @@ public final class MetronomeTransport: @unchecked Sendable {
     public func start(state: MetronomeState) throws {
         stop()
 
-        let engine = AudioEngineManager(sampleRate: configuration.sampleRate, layerGains: state.layerGains)
+        let engine = AudioEngineManager(
+            sampleRate: configuration.sampleRate,
+            layerGains: state.layerGains,
+            outputSelection: state.outputSelection
+        )
         let scheduler = MetronomeScheduler(sampleRate: configuration.sampleRate, startSampleTime: 0, state: state)
 
         lock.lock()

@@ -1,9 +1,12 @@
 import AVFoundation
+import AudioToolbox
+import CoreAudio
 import Foundation
 
 public final class AudioEngineManager {
     public enum EngineError: Error {
         case outputFormatUnavailable
+        case outputDeviceUnavailable(OSStatus)
     }
 
     public let engine: AVAudioEngine
@@ -14,18 +17,26 @@ public final class AudioEngineManager {
 
     private let clickGenerator: ClickGenerator
 
-    public init(sampleRate: Double = 48_000, layerGains: LayerGains = .default) {
+    private let outputSelection: AudioOutputSelection
+
+    public init(
+        sampleRate: Double = 48_000,
+        layerGains: LayerGains = .default,
+        outputSelection: AudioOutputSelection = .systemDefault
+    ) {
         self.engine = AVAudioEngine()
         self.accentNode = AVAudioPlayerNode()
         self.normalNode = AVAudioPlayerNode()
         self.subdivisionNode = AVAudioPlayerNode()
         self.polyrhythmNode = AVAudioPlayerNode()
         self.clickGenerator = ClickGenerator(sampleRate: sampleRate)
+        self.outputSelection = outputSelection
         configureGraph()
         updateGains(layerGains)
     }
 
     public func start() throws {
+        try applyOutputSelection()
         if !engine.isRunning {
             try engine.start()
         }
@@ -88,6 +99,28 @@ public final class AudioEngineManager {
             subdivisionNode
         case .polyrhythm:
             polyrhythmNode
+        }
+    }
+
+    private func applyOutputSelection() throws {
+        engine.outputNode.auAudioUnit.channelMap = [
+            NSNumber(value: Int32(outputSelection.channelPair.left)),
+            NSNumber(value: Int32(outputSelection.channelPair.right))
+        ]
+
+        guard let deviceID = outputSelection.deviceID else { return }
+
+        var selectedDeviceID = deviceID
+        let status = AudioUnitSetProperty(
+            engine.outputNode.audioUnit!,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &selectedDeviceID,
+            UInt32(MemoryLayout<AudioDeviceID>.size)
+        )
+        guard status == noErr else {
+            throw EngineError.outputDeviceUnavailable(status)
         }
     }
 }

@@ -23,7 +23,9 @@ final class MetronomeViewModel {
     var normalGain: Double = 0.8
     var subdivisionGain: Double = 0.6
     var polyrhythmGain: Double = 0.7
-    var outputDevices: [String] = []
+    var outputDevices: [AudioOutputDevice] = []
+    var selectedOutputDeviceID: UInt32?
+    var selectedChannelPair = ChannelPair.stereoMain
     var isPlaying = false
     var status = "Ready"
 
@@ -138,12 +140,48 @@ final class MetronomeViewModel {
 
     func refreshDevices() {
         do {
-            outputDevices = try OutputDeviceManager.outputDevices().map { device in
-                "\(device.name) (\(device.outputChannelCount) ch)"
+            outputDevices = try OutputDeviceManager.outputDevices()
+            if let selectedOutputDeviceID, !outputDevices.contains(where: { $0.id == selectedOutputDeviceID }) {
+                self.selectedOutputDeviceID = nil
+                selectedChannelPair = .stereoMain
+            }
+            if let selectedDevice, !selectedDevice.channelPairs.contains(selectedChannelPair) {
+                selectedChannelPair = selectedDevice.channelPairs.first ?? .stereoMain
             }
         } catch {
-            outputDevices = ["Device query failed"]
+            outputDevices = []
+            status = "Device query failed"
         }
+    }
+
+    var selectedDevice: AudioOutputDevice? {
+        guard let selectedOutputDeviceID else { return nil }
+        return outputDevices.first { $0.id == selectedOutputDeviceID }
+    }
+
+    var availableChannelPairs: [ChannelPair] {
+        selectedDevice?.channelPairs ?? [.stereoMain]
+    }
+
+    func selectOutputDevice(_ deviceID: UInt32?) {
+        selectedOutputDeviceID = deviceID
+        if let selectedDevice {
+            selectedChannelPair = selectedDevice.channelPairs.first ?? .stereoMain
+        } else {
+            selectedChannelPair = .stereoMain
+        }
+        applyChangedOutput()
+    }
+
+    func selectChannelPair(_ channelPair: ChannelPair) {
+        selectedChannelPair = channelPair
+        applyChangedOutput()
+    }
+
+    private func applyChangedOutput() {
+        saveSettings()
+        guard isPlaying else { return }
+        start()
     }
 
     private func loadSettings() {
@@ -172,6 +210,8 @@ final class MetronomeViewModel {
         normalGain = settings.normalGain
         subdivisionGain = settings.subdivisionGain
         polyrhythmGain = settings.polyrhythmGain
+        selectedOutputDeviceID = settings.selectedOutputDeviceID
+        selectedChannelPair = settings.selectedChannelPair ?? .stereoMain
     }
 
     private func saveSettings() {
@@ -193,7 +233,9 @@ final class MetronomeViewModel {
             accentGain: accentGain,
             normalGain: normalGain,
             subdivisionGain: subdivisionGain,
-            polyrhythmGain: polyrhythmGain
+            polyrhythmGain: polyrhythmGain,
+            selectedOutputDeviceID: selectedOutputDeviceID,
+            selectedChannelPair: selectedChannelPair
         )
 
         if let data = try? JSONEncoder().encode(settings) {
@@ -237,6 +279,10 @@ final class MetronomeViewModel {
                 subdivision: Float(subdivisionGain),
                 polyrhythm: Float(polyrhythmGain)
             ),
+            outputSelection: AudioOutputSelection(
+                deviceID: selectedOutputDeviceID,
+                channelPair: selectedChannelPair
+            ),
             isPlaying: isPlaying
         )
     }
@@ -261,4 +307,6 @@ private struct AppSettings: Codable {
     var normalGain: Double
     var subdivisionGain: Double
     var polyrhythmGain: Double
+    var selectedOutputDeviceID: UInt32?
+    var selectedChannelPair: ChannelPair?
 }

@@ -9,6 +9,7 @@ public struct MetronomeState: Codable, Equatable, Sendable {
     public var tempoRamp: TempoRamp?
     public var polyrhythm: PolyrhythmSettings?
     public var layerGains: LayerGains
+    public var outputSelection: AudioOutputSelection
     public var isPlaying: Bool
 
     public init(
@@ -20,6 +21,7 @@ public struct MetronomeState: Codable, Equatable, Sendable {
         tempoRamp: TempoRamp? = nil,
         polyrhythm: PolyrhythmSettings? = nil,
         layerGains: LayerGains = .default,
+        outputSelection: AudioOutputSelection = .systemDefault,
         isPlaying: Bool = false
     ) {
         precondition(bpm > 0, "BPM must be greater than zero")
@@ -31,6 +33,7 @@ public struct MetronomeState: Codable, Equatable, Sendable {
         self.tempoRamp = tempoRamp
         self.polyrhythm = polyrhythm
         self.layerGains = layerGains
+        self.outputSelection = outputSelection
         self.isPlaying = isPlaying
     }
 }

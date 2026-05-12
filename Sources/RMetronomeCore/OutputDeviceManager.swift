@@ -1,7 +1,7 @@
 import CoreAudio
 import Foundation
 
-public struct AudioOutputDevice: Equatable, Sendable {
+public struct AudioOutputDevice: Codable, Equatable, Identifiable, Sendable {
     public var id: AudioObjectID
     public var name: String
     public var outputChannelCount: Int
@@ -10,6 +10,14 @@ public struct AudioOutputDevice: Equatable, Sendable {
         self.id = id
         self.name = name
         self.outputChannelCount = outputChannelCount
+    }
+
+    public var channelPairs: [ChannelPair] {
+        stride(from: 0, to: outputChannelCount, by: 2).compactMap { left in
+            let right = left + 1
+            guard right < outputChannelCount else { return nil }
+            return ChannelPair(left: left, right: right)
+        }
     }
 }
 

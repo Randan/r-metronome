@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ChannelPair: Equatable, Sendable {
+public struct ChannelPair: Codable, Equatable, Hashable, Sendable {
     public var left: Int
     public var right: Int
 
@@ -12,6 +12,10 @@ public struct ChannelPair: Equatable, Sendable {
     }
 
     public static let stereoMain = ChannelPair(left: 0, right: 1)
+
+    public var displayName: String {
+        "\(left + 1)-\(right + 1)"
+    }
 }
 
 public struct OutputRouting: Equatable, Sendable {
