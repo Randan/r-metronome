@@ -91,14 +91,27 @@ struct MetronomeView: View {
 
     private var pendulumPanel: some View {
         section("Pendulum") {
-            MovingBeatIndicator(
-                bpm: viewModel.bpm,
-                polyrhythmBPM: viewModel.polyrhythmDisplayBPM,
-                showsPolyrhythm: viewModel.polyrhythmEnabled,
-                isPlaying: viewModel.isPlaying
-            )
-                .frame(height: viewModel.polyrhythmEnabled ? 86 : 42)
+            VStack(spacing: 12) {
+                Picker("", selection: $viewModel.pendulumMode) {
+                    ForEach(PendulumMode.allCases, id: \.rawValue) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+                .onChange(of: viewModel.pendulumMode) { _, _ in viewModel.applyChangedTiming() }
+
+                BeatIndicator(
+                    mode: viewModel.pendulumMode,
+                    bpm: viewModel.bpm,
+                    polyrhythmBPM: viewModel.polyrhythmDisplayBPM,
+                    showsPolyrhythm: viewModel.polyrhythmEnabled,
+                    isPlaying: viewModel.isPlaying
+                )
+                .frame(height: viewModel.pendulumMode == .blink ? 80 : (viewModel.polyrhythmEnabled ? 86 : 42))
                 .frame(maxWidth: .infinity)
+            }
         }
     }
 
@@ -372,12 +385,14 @@ struct MetronomeView: View {
         viewModel.normalGain = 0.8
         viewModel.subdivisionGain = 0.6
         viewModel.polyrhythmGain = 0.7
+        viewModel.pendulumMode = .swing
         viewModel.selectOutputDevice(nil)
         viewModel.applyChangedTiming()
     }
 }
 
-private struct MovingBeatIndicator: View {
+private struct BeatIndicator: View {
+    var mode: PendulumMode
     var bpm: Double
     var polyrhythmBPM: Double
     var showsPolyrhythm: Bool
@@ -385,12 +400,24 @@ private struct MovingBeatIndicator: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
-            VStack(spacing: 12) {
-                movingSquare(color: .blue, bpm: bpm, date: timeline.date)
+            switch mode {
+            case .swing:
+                VStack(spacing: 12) {
+                    movingSquare(color: .blue, bpm: bpm, date: timeline.date)
 
-                if showsPolyrhythm {
-                    movingSquare(color: .red, bpm: polyrhythmBPM, date: timeline.date)
+                    if showsPolyrhythm {
+                        movingSquare(color: .red, bpm: polyrhythmBPM, date: timeline.date)
+                    }
                 }
+            case .blink:
+                HStack(spacing: 0) {
+                    blinkBar(color: .blue, bpm: bpm, date: timeline.date)
+
+                    if showsPolyrhythm {
+                        blinkBar(color: .red, bpm: polyrhythmBPM, date: timeline.date)
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
     }
@@ -409,6 +436,17 @@ private struct MovingBeatIndicator: View {
                 .offset(x: travel * position)
         }
         .frame(height: 30)
+    }
+
+    private func blinkBar(color: Color, bpm: Double, date: Date) -> some View {
+        let beatDuration = 60.0 / max(bpm, 1)
+        let phase = isPlaying ? date.timeIntervalSinceReferenceDate / beatDuration : 0
+        let beatPhase = phase - floor(phase)
+        let intensity = isPlaying ? max(0.18, 1.0 - beatPhase * 3.5) : 0.18
+
+        return Rectangle()
+            .fill(color.opacity(intensity))
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

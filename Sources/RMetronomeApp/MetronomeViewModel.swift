@@ -26,6 +26,7 @@ final class MetronomeViewModel {
     var outputDevices: [AudioOutputDevice] = []
     var selectedOutputDeviceID: UInt32?
     var selectedChannelPair = ChannelPair.stereoMain
+    var pendulumMode: PendulumMode = .swing
     var isPlaying = false
     var status = "Ready"
 
@@ -216,6 +217,7 @@ final class MetronomeViewModel {
         polyrhythmGain = settings.polyrhythmGain
         selectedOutputDeviceID = settings.selectedOutputDeviceID
         selectedChannelPair = settings.selectedChannelPair ?? .stereoMain
+        pendulumMode = settings.pendulumMode ?? .swing
     }
 
     private func saveSettings() {
@@ -239,7 +241,8 @@ final class MetronomeViewModel {
             subdivisionGain: subdivisionGain,
             polyrhythmGain: polyrhythmGain,
             selectedOutputDeviceID: selectedOutputDeviceID,
-            selectedChannelPair: selectedChannelPair
+            selectedChannelPair: selectedChannelPair,
+            pendulumMode: pendulumMode
         )
 
         if let data = try? JSONEncoder().encode(settings) {
@@ -310,4 +313,19 @@ private struct AppSettings: Codable {
     var polyrhythmGain: Double
     var selectedOutputDeviceID: UInt32?
     var selectedChannelPair: ChannelPair?
+    var pendulumMode: PendulumMode?
+}
+
+enum PendulumMode: String, Codable, CaseIterable {
+    case swing
+    case blink
+
+    var title: String {
+        switch self {
+        case .swing:
+            "Swing"
+        case .blink:
+            "Blink"
+        }
+    }
 }
