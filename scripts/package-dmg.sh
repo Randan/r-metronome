@@ -2,14 +2,15 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="r-metronome"
-EXECUTABLE_NAME="r-metronome"
+APP_NAME="RMetronome"
+EXECUTABLE_NAME="RMetronome"
 PRODUCT_NAME="r-metronome-app"
 BUNDLE_ID="com.randan.r-metronome"
 DIST_DIR="$ROOT_DIR/dist"
 APP_DIR="$DIST_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_DIR/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
+RESOURCES_DIR="$CONTENTS_DIR/Resources"
 DMG_PATH="$DIST_DIR/$APP_NAME.dmg"
 
 cd "$ROOT_DIR"
@@ -31,10 +32,11 @@ if [[ -z "${BINARY_PATH:-}" || ! -x "$BINARY_PATH" ]]; then
 fi
 
 rm -rf "$APP_DIR" "$DMG_PATH"
-mkdir -p "$MACOS_DIR"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 cp "$BINARY_PATH" "$MACOS_DIR/$EXECUTABLE_NAME"
 chmod 755 "$MACOS_DIR/$EXECUTABLE_NAME"
+cp "$ROOT_DIR/Sources/RMetronomeApp/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
 cat > "$CONTENTS_DIR/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -49,6 +51,8 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
     <string>$BUNDLE_ID</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleName</key>
     <string>$APP_NAME</string>
     <key>CFBundlePackageType</key>

@@ -116,7 +116,7 @@ Build a release `.app` bundle and DMG:
 make dmg
 ```
 
-The generated package is written to `dist/r-metronome.dmg`.
+The generated package is written to `dist/RMetronome.dmg`.
 
 ## Timing Contract
 

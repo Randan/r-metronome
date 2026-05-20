@@ -39,6 +39,7 @@ struct MetronomeView: View {
         .contentShape(Rectangle())
         .onTapGesture { clearFocus() }
         .background(Color(nsColor: .windowBackgroundColor))
+        .tint(.appAccent)
         .onAppear {
             viewModel.refreshDevices()
             DispatchQueue.main.async { clearFocus() }
@@ -48,11 +49,8 @@ struct MetronomeView: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 16) {
             VStack(alignment: .leading, spacing: 3) {
-                Text("r-metronome")
+                Text("RMetronome")
                     .font(.system(size: 26, weight: .semibold))
-                Text(viewModel.status)
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -92,7 +90,7 @@ struct MetronomeView: View {
                         .onChange(of: viewModel.bpm) { _, _ in viewModel.applyChangedTiming() }
                 }
 
-                Slider(value: $viewModel.bpm, in: 20...300, step: 1)
+                Slider(value: $viewModel.bpm, in: 20...300)
                     .onChange(of: viewModel.bpm) { _, _ in viewModel.applyChangedTiming() }
 
                 HStack(spacing: 10) {
@@ -295,7 +293,7 @@ struct MetronomeView: View {
                             }
 
                         HStack(spacing: 10) {
-                            Slider(value: $viewModel.manualLatencyCompensationMilliseconds, in: 0...300, step: 1)
+                            Slider(value: $viewModel.manualLatencyCompensationMilliseconds, in: 0...300)
                                 .disabled(viewModel.automaticLatencyCompensation)
                                 .onChange(of: viewModel.manualLatencyCompensationMilliseconds) { _, _ in
                                     viewModel.applyChangedLatencyCompensation()
@@ -395,7 +393,7 @@ struct MetronomeView: View {
     private func gainSlider(_ title: String, value: Binding<Double>) -> some View {
         controlRow(title) {
             HStack {
-                Slider(value: value, in: 0...1, step: 0.05)
+                Slider(value: value, in: 0...1)
                     .onChange(of: value.wrappedValue) { _, _ in viewModel.applyChangedTiming() }
                 Text("\(Int((value.wrappedValue * 100).rounded()))%")
                     .monospacedDigit()
@@ -722,6 +720,10 @@ private extension Int {
         let remainder = self % divisor
         return remainder >= 0 ? remainder : remainder + divisor
     }
+}
+
+private extension Color {
+    static let appAccent = Color(red: 212.0 / 255.0, green: 87.0 / 255.0, blue: 15.0 / 255.0)
 }
 
 #Preview {

@@ -25,7 +25,10 @@ let package = Package(
         .executableTarget(
             name: "RMetronomeApp",
             dependencies: ["RMetronomeCore"],
-            path: "Sources/RMetronomeApp"
+            path: "Sources/RMetronomeApp",
+            resources: [
+                .process("Resources")
+            ]
         ),
         .testTarget(
             name: "RMetronomeCoreTests",
