@@ -145,6 +145,11 @@ final class MetronomeViewModel {
         applyChangedTiming()
     }
 
+    func adjustTempo(by delta: Double) {
+        bpm = min(max((bpm + delta).rounded(), 20), 300)
+        applyChangedTiming()
+    }
+
     func refreshDevices() {
         do {
             outputDevices = try OutputDeviceManager.outputDevices()

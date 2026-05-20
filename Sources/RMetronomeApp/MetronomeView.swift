@@ -1,8 +1,15 @@
+@preconcurrency import AppKit
 import RMetronomeCore
 import SwiftUI
 
 struct MetronomeView: View {
+    private enum FocusedField: Hashable {
+        case grouping
+        case pattern
+    }
+
     @State private var viewModel = MetronomeViewModel()
+    @FocusState private var focusedField: FocusedField?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -23,8 +30,18 @@ struct MetronomeView: View {
 
             transportBar
         }
+        .background(
+            KeyboardAndFocusMonitor(
+                hasTextFocus: { focusedField != nil },
+                clearFocus: { clearFocus() },
+                handleCommand: handleKeyboardCommand(_:)
+            )
+        )
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { viewModel.refreshDevices() }
+        .onAppear {
+            viewModel.refreshDevices()
+            DispatchQueue.main.async { clearFocus() }
+        }
     }
 
     private var header: some View {
@@ -156,6 +173,7 @@ struct MetronomeView: View {
                 controlRow("Grouping") {
                     TextField("3+2+2", text: $viewModel.groupingText)
                         .textFieldStyle(.roundedBorder)
+                        .focused($focusedField, equals: .grouping)
                         .onSubmit { viewModel.applyGroupingText() }
                         .onChange(of: viewModel.groupingText) { _, _ in
                             guard viewModel.groupingText.isEmpty else { return }
@@ -166,6 +184,7 @@ struct MetronomeView: View {
                 controlRow("Grid") {
                     TextField("A n n x", text: $viewModel.patternText)
                         .textFieldStyle(.roundedBorder)
+                        .focused($focusedField, equals: .pattern)
                         .onSubmit { viewModel.applyPatternText() }
                         .onChange(of: viewModel.patternText) { _, _ in
                             guard viewModel.patternText.isEmpty else { return }
@@ -430,6 +449,149 @@ struct MetronomeView: View {
         viewModel.manualLatencyCompensationMilliseconds = 0
         viewModel.selectOutputDevice(nil)
         viewModel.applyChangedTiming()
+    }
+
+    private func clearFocus() {
+        focusedField = nil
+        NSApp.keyWindow?.makeFirstResponder(nil)
+    }
+
+    private func handleKeyboardCommand(_ command: KeyboardCommand) {
+        switch command {
+        case .togglePlayback:
+            viewModel.togglePlayback()
+        case .decreaseTempo:
+            viewModel.adjustTempo(by: -1)
+        case .increaseTempo:
+            viewModel.adjustTempo(by: 1)
+        }
+    }
+}
+
+private enum KeyboardCommand {
+    case togglePlayback
+    case decreaseTempo
+    case increaseTempo
+}
+
+private struct KeyboardAndFocusMonitor: NSViewRepresentable {
+    var hasTextFocus: () -> Bool
+    var clearFocus: () -> Void
+    var handleCommand: (KeyboardCommand) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            hasTextFocus: hasTextFocus,
+            clearFocus: clearFocus,
+            handleCommand: handleCommand
+        )
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        context.coordinator.view = view
+        context.coordinator.installMonitor()
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.view = nsView
+        context.coordinator.hasTextFocus = hasTextFocus
+        context.coordinator.clearFocus = clearFocus
+        context.coordinator.handleCommand = handleCommand
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.removeMonitor()
+    }
+
+    final class Coordinator: NSObject {
+        weak var view: NSView?
+        var hasTextFocus: () -> Bool
+        var clearFocus: () -> Void
+        var handleCommand: (KeyboardCommand) -> Void
+        private var monitor: Any?
+
+        init(
+            hasTextFocus: @escaping () -> Bool,
+            clearFocus: @escaping () -> Void,
+            handleCommand: @escaping (KeyboardCommand) -> Void
+        ) {
+            self.hasTextFocus = hasTextFocus
+            self.clearFocus = clearFocus
+            self.handleCommand = handleCommand
+        }
+
+        func installMonitor() {
+            guard monitor == nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak self] event in
+                self?.handle(event) ?? event
+            }
+        }
+
+        func removeMonitor() {
+            if let monitor {
+                NSEvent.removeMonitor(monitor)
+            }
+            monitor = nil
+        }
+
+        private func handle(_ event: NSEvent) -> NSEvent? {
+            guard event.window != nil else { return event }
+
+            switch event.type {
+            case .keyDown:
+                return handleKeyDown(event)
+            case .leftMouseDown:
+                if !isTextInputEventTarget(event) {
+                    perform(#selector(clearFocusIfNeededAfterMouseDown), with: nil, afterDelay: 0)
+                }
+                return event
+            default:
+                return event
+            }
+        }
+
+        @objc private func clearFocusIfNeededAfterMouseDown() {
+            clearFocusIfNeeded()
+        }
+
+        private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
+            guard !hasTextFocus() else { return event }
+
+            switch event.keyCode {
+            case 49:
+                handleCommand(.togglePlayback)
+                return nil
+            case 123:
+                handleCommand(.decreaseTempo)
+                return nil
+            case 124:
+                handleCommand(.increaseTempo)
+                return nil
+            default:
+                return event
+            }
+        }
+
+        private func clearFocusIfNeeded() {
+            clearFocus()
+        }
+
+        private func isTextInputEventTarget(_ event: NSEvent) -> Bool {
+            guard let window = event.window, let contentView = window.contentView else { return false }
+            let point = contentView.convert(event.locationInWindow, from: nil)
+            var target: NSView? = contentView.hitTest(point)
+
+            while let current = target {
+                if current is NSTextField || current is NSTextView {
+                    return true
+                }
+                target = current.superview
+            }
+
+            return false
+        }
     }
 }
 

@@ -16,7 +16,8 @@ struct RMetronomeApp: App {
     var body: some Scene {
         WindowGroup {
             MetronomeView()
-                .frame(width: 640, height: 760)
+                .frame(width: 640)
+                .frame(minHeight: 320, maxHeight: 900)
         }
         .defaultSize(width: 640, height: 760)
         .windowResizability(.contentSize)
