@@ -109,6 +109,7 @@ struct MetronomeView: View {
                     polyrhythmBPM: viewModel.polyrhythmDisplayBPM,
                     polyrhythmBeats: viewModel.polyrhythmBeats,
                     showsPolyrhythm: viewModel.polyrhythmEnabled,
+                    latencyCompensationMilliseconds: viewModel.effectiveLatencyCompensationMilliseconds,
                     isPlaying: viewModel.isPlaying
                 )
                 .frame(height: indicatorHeight)
@@ -265,6 +266,32 @@ struct MetronomeView: View {
                     .disabled(viewModel.selectedDevice == nil)
                 }
 
+                controlRow("Latency") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Auto compensate", isOn: $viewModel.automaticLatencyCompensation)
+                            .toggleStyle(.checkbox)
+                            .onChange(of: viewModel.automaticLatencyCompensation) { _, _ in
+                                viewModel.applyChangedLatencyCompensation()
+                            }
+
+                        HStack(spacing: 10) {
+                            Slider(value: $viewModel.manualLatencyCompensationMilliseconds, in: 0...300, step: 1)
+                                .disabled(viewModel.automaticLatencyCompensation)
+                                .onChange(of: viewModel.manualLatencyCompensationMilliseconds) { _, _ in
+                                    viewModel.applyChangedLatencyCompensation()
+                                }
+
+                            Text(viewModel.latencyCompensationSummary)
+                                .monospacedDigit()
+                                .frame(width: 64, alignment: .trailing)
+                        }
+
+                        Text(viewModel.selectedDeviceLatencySummary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
                 HStack {
                     Spacer()
                     Button("Refresh Devices") {
@@ -399,6 +426,8 @@ struct MetronomeView: View {
         viewModel.subdivisionGain = 0.6
         viewModel.polyrhythmGain = 0.7
         viewModel.pendulumMode = .swing
+        viewModel.automaticLatencyCompensation = true
+        viewModel.manualLatencyCompensationMilliseconds = 0
         viewModel.selectOutputDevice(nil)
         viewModel.applyChangedTiming()
     }
@@ -411,6 +440,7 @@ private struct BeatIndicator: View {
     var polyrhythmBPM: Double
     var polyrhythmBeats: Int
     var showsPolyrhythm: Bool
+    var latencyCompensationMilliseconds: Double
     var isPlaying: Bool
 
     var body: some View {
@@ -444,7 +474,7 @@ private struct BeatIndicator: View {
             let size = 30.0
             let travel = max(0, geometry.size.width - size)
             let beatDuration = 60.0 / max(bpm, 1)
-            let phase = isPlaying ? date.timeIntervalSinceReferenceDate / beatDuration : 0
+            let phase = isPlaying ? compensatedTime(for: date) / beatDuration : 0
             let position = (sin(phase * .pi * 2.0 - .pi / 2.0) + 1.0) / 2.0
 
             RoundedRectangle(cornerRadius: 4)
@@ -457,7 +487,7 @@ private struct BeatIndicator: View {
 
     private func blinkBar(color: Color, bpm: Double, date: Date) -> some View {
         let beatDuration = 60.0 / max(bpm, 1)
-        let phase = isPlaying ? date.timeIntervalSinceReferenceDate / beatDuration : 0
+        let phase = isPlaying ? compensatedTime(for: date) / beatDuration : 0
         let beatPhase = phase - floor(phase)
         let intensity = isPlaying ? max(0.18, 1.0 - beatPhase * 3.5) : 0.18
 
@@ -473,7 +503,7 @@ private struct BeatIndicator: View {
             let outerRadius = size * 0.42
             let innerRadius = size * 0.27
             let measureDuration = 60.0 / max(bpm, 1) * Double(max(beatsPerMeasure, 1))
-            let phase = isPlaying ? date.timeIntervalSinceReferenceDate / measureDuration : 0
+            let phase = isPlaying ? compensatedTime(for: date) / measureDuration : 0
             let angle = phase * .pi * 2.0 - .pi / 2.0
             let handEnd = CGPoint(
                 x: center.x + cos(angle) * outerRadius,
@@ -548,7 +578,7 @@ private struct BeatIndicator: View {
             y: center.y + sin(dotAngle) * radius
         )
         let beatDuration = 60.0 / max(bpm, 1)
-        let phase = isPlaying ? date.timeIntervalSinceReferenceDate / beatDuration : 0
+        let phase = isPlaying ? compensatedTime(for: date) / beatDuration : 0
         let activeIndex = Int(floor(phase)).modulo(max(count, 1))
         let active = isPlaying && activeIndex == index
 
@@ -557,6 +587,10 @@ private struct BeatIndicator: View {
             .frame(width: active ? 26 : 16, height: active ? 26 : 16)
             .shadow(color: active ? color.opacity(0.65) : .clear, radius: 8)
             .position(point)
+    }
+
+    private func compensatedTime(for date: Date) -> TimeInterval {
+        date.timeIntervalSinceReferenceDate - latencyCompensationMilliseconds / 1_000.0
     }
 }
 

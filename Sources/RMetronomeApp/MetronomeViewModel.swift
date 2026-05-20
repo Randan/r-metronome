@@ -27,6 +27,8 @@ final class MetronomeViewModel {
     var selectedOutputDeviceID: UInt32?
     var selectedChannelPair = ChannelPair.stereoMain
     var pendulumMode: PendulumMode = .swing
+    var automaticLatencyCompensation = true
+    var manualLatencyCompensationMilliseconds: Double = 0
     var isPlaying = false
     var status = "Ready"
 
@@ -168,6 +170,35 @@ final class MetronomeViewModel {
         selectedDevice?.channelPairs ?? [.stereoMain]
     }
 
+    var effectiveLatencyCompensationMilliseconds: Double {
+        if automaticLatencyCompensation {
+            return automaticLatencyCompensationMilliseconds
+        }
+        return manualLatencyCompensationMilliseconds
+    }
+
+    var automaticLatencyCompensationMilliseconds: Double {
+        guard let selectedDevice else { return 0 }
+        if selectedDevice.isWireless {
+            return max(selectedDevice.reportedLatencyMilliseconds ?? 0, 150)
+        }
+        return selectedDevice.reportedLatencyMilliseconds ?? 0
+    }
+
+    var latencyCompensationSummary: String {
+        let milliseconds = effectiveLatencyCompensationMilliseconds
+        guard milliseconds > 0 else { return "No compensation" }
+        return "\(Int(milliseconds.rounded())) ms"
+    }
+
+    var selectedDeviceLatencySummary: String {
+        guard let selectedDevice else { return "System default output" }
+
+        let reported = selectedDevice.reportedLatencyMilliseconds.map { "\(Int($0.rounded())) ms reported" } ?? "latency unknown"
+        let transport = selectedDevice.isWireless ? "wireless" : selectedDevice.transportTypeName
+        return "\(transport), \(reported)"
+    }
+
     var polyrhythmDisplayBPM: Double {
         bpm * Double(polyrhythmBeats) / Double(max(beatsPerMeasure, 1))
     }
@@ -185,6 +216,10 @@ final class MetronomeViewModel {
     func selectChannelPair(_ channelPair: ChannelPair) {
         selectedChannelPair = channelPair
         applyChangedOutput()
+    }
+
+    func applyChangedLatencyCompensation() {
+        saveSettings()
     }
 
     private func applyChangedOutput() {
@@ -222,6 +257,8 @@ final class MetronomeViewModel {
         selectedOutputDeviceID = settings.selectedOutputDeviceID
         selectedChannelPair = settings.selectedChannelPair ?? .stereoMain
         pendulumMode = settings.pendulumMode ?? .swing
+        automaticLatencyCompensation = settings.automaticLatencyCompensation ?? true
+        manualLatencyCompensationMilliseconds = settings.manualLatencyCompensationMilliseconds ?? 0
     }
 
     private func saveSettings() {
@@ -246,7 +283,9 @@ final class MetronomeViewModel {
             polyrhythmGain: polyrhythmGain,
             selectedOutputDeviceID: selectedOutputDeviceID,
             selectedChannelPair: selectedChannelPair,
-            pendulumMode: pendulumMode
+            pendulumMode: pendulumMode,
+            automaticLatencyCompensation: automaticLatencyCompensation,
+            manualLatencyCompensationMilliseconds: manualLatencyCompensationMilliseconds
         )
 
         if let data = try? JSONEncoder().encode(settings) {
@@ -318,6 +357,8 @@ private struct AppSettings: Codable {
     var selectedOutputDeviceID: UInt32?
     var selectedChannelPair: ChannelPair?
     var pendulumMode: PendulumMode?
+    var automaticLatencyCompensation: Bool?
+    var manualLatencyCompensationMilliseconds: Double?
 }
 
 enum PendulumMode: String, Codable, CaseIterable {
