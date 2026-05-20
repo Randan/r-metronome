@@ -33,10 +33,11 @@ struct MetronomeView: View {
         .background(
             KeyboardAndFocusMonitor(
                 hasTextFocus: { focusedField != nil },
-                clearFocus: { clearFocus() },
                 handleCommand: handleKeyboardCommand(_:)
             )
         )
+        .contentShape(Rectangle())
+        .onTapGesture { clearFocus() }
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
             viewModel.refreshDevices()
@@ -476,13 +477,11 @@ private enum KeyboardCommand {
 
 private struct KeyboardAndFocusMonitor: NSViewRepresentable {
     var hasTextFocus: () -> Bool
-    var clearFocus: () -> Void
     var handleCommand: (KeyboardCommand) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             hasTextFocus: hasTextFocus,
-            clearFocus: clearFocus,
             handleCommand: handleCommand
         )
     }
@@ -497,7 +496,6 @@ private struct KeyboardAndFocusMonitor: NSViewRepresentable {
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.view = nsView
         context.coordinator.hasTextFocus = hasTextFocus
-        context.coordinator.clearFocus = clearFocus
         context.coordinator.handleCommand = handleCommand
     }
 
@@ -508,23 +506,20 @@ private struct KeyboardAndFocusMonitor: NSViewRepresentable {
     final class Coordinator: NSObject {
         weak var view: NSView?
         var hasTextFocus: () -> Bool
-        var clearFocus: () -> Void
         var handleCommand: (KeyboardCommand) -> Void
         private var monitor: Any?
 
         init(
             hasTextFocus: @escaping () -> Bool,
-            clearFocus: @escaping () -> Void,
             handleCommand: @escaping (KeyboardCommand) -> Void
         ) {
             self.hasTextFocus = hasTextFocus
-            self.clearFocus = clearFocus
             self.handleCommand = handleCommand
         }
 
         func installMonitor() {
             guard monitor == nil else { return }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseDown]) { [weak self] event in
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 self?.handle(event) ?? event
             }
         }
@@ -537,23 +532,7 @@ private struct KeyboardAndFocusMonitor: NSViewRepresentable {
         }
 
         private func handle(_ event: NSEvent) -> NSEvent? {
-            guard event.window != nil else { return event }
-
-            switch event.type {
-            case .keyDown:
-                return handleKeyDown(event)
-            case .leftMouseDown:
-                if !isTextInputEventTarget(event) {
-                    perform(#selector(clearFocusIfNeededAfterMouseDown), with: nil, afterDelay: 0)
-                }
-                return event
-            default:
-                return event
-            }
-        }
-
-        @objc private func clearFocusIfNeededAfterMouseDown() {
-            clearFocusIfNeeded()
+            handleKeyDown(event)
         }
 
         private func handleKeyDown(_ event: NSEvent) -> NSEvent? {
@@ -572,25 +551,6 @@ private struct KeyboardAndFocusMonitor: NSViewRepresentable {
             default:
                 return event
             }
-        }
-
-        private func clearFocusIfNeeded() {
-            clearFocus()
-        }
-
-        private func isTextInputEventTarget(_ event: NSEvent) -> Bool {
-            guard let window = event.window, let contentView = window.contentView else { return false }
-            let point = contentView.convert(event.locationInWindow, from: nil)
-            var target: NSView? = contentView.hitTest(point)
-
-            while let current = target {
-                if current is NSTextField || current is NSTextView {
-                    return true
-                }
-                target = current.superview
-            }
-
-            return false
         }
     }
 }
