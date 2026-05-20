@@ -40,6 +40,10 @@ final class MetronomeViewModel {
         loadSettings()
     }
 
+    deinit {
+        transport.stop()
+    }
+
     func togglePlayback() {
         if isPlaying {
             stop()
@@ -192,7 +196,7 @@ final class MetronomeViewModel {
 
     var latencyCompensationSummary: String {
         let milliseconds = effectiveLatencyCompensationMilliseconds
-        guard milliseconds > 0 else { return "No compensation" }
+        guard milliseconds > 0 else { return "-" }
         return "\(Int(milliseconds.rounded())) ms"
     }
 

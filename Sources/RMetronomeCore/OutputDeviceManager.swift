@@ -79,12 +79,13 @@ public enum OutputDeviceManager {
         status = AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &dataSize, &ids)
         guard status == noErr else { throw CoreAudioError(status: status) }
 
-        return try ids.compactMap { id in
-            let channels = try outputChannelCount(deviceID: id)
-            guard channels > 0 else { return nil }
+        return ids.compactMap { id in
+            guard let channels = try? outputChannelCount(deviceID: id), channels > 0 else {
+                return nil
+            }
             return AudioOutputDevice(
                 id: id,
-                name: try deviceName(deviceID: id),
+                name: (try? deviceName(deviceID: id)) ?? "Output \(id)",
                 outputChannelCount: channels,
                 transportType: transportType(deviceID: id),
                 reportedLatencyMilliseconds: reportedLatencyMilliseconds(deviceID: id)

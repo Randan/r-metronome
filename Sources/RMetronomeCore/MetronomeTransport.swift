@@ -31,6 +31,8 @@ public final class MetronomeTransport: @unchecked Sendable {
     private var scheduledThroughSample: Int64 = -1
     private var isRunning = false
     private var plannerThread: Thread?
+    private var plannerGeneration = 0
+    private var scheduleRevision = 0
 
     public init(configuration: Configuration = Configuration()) {
         self.configuration = configuration
@@ -50,12 +52,18 @@ public final class MetronomeTransport: @unchecked Sendable {
         audioEngine = engine
         self.scheduler = scheduler
         scheduledThroughSample = -1
+        scheduleRevision += 1
         isRunning = true
         lock.unlock()
 
-        scheduleAhead(from: 0)
-        try engine.start()
-        startPlannerThread()
+        do {
+            scheduleAhead(from: 0)
+            try engine.start()
+            startPlannerThread()
+        } catch {
+            stop()
+            throw error
+        }
     }
 
     public func update(state: MetronomeState) {
@@ -73,6 +81,8 @@ public final class MetronomeTransport: @unchecked Sendable {
             startSampleTime: currentStartSample,
             state: state
         )
+        scheduleRevision += 1
+        let revision = scheduleRevision
         audioEngine?.updateGains(state.layerGains)
         let scheduler = scheduler
         let engine = audioEngine
@@ -80,6 +90,7 @@ public final class MetronomeTransport: @unchecked Sendable {
         lock.unlock()
 
         let events = scheduler?.events(from: lowerBound, through: upperBound) ?? []
+        guard shouldScheduleEvents(for: revision) else { return }
         engine?.reschedule(events, interruptingAt: lowerBound)
     }
 
@@ -88,6 +99,8 @@ public final class MetronomeTransport: @unchecked Sendable {
         isRunning = false
         plannerThread?.cancel()
         plannerThread = nil
+        plannerGeneration += 1
+        scheduleRevision += 1
         let engine = audioEngine
         audioEngine = nil
         scheduler = nil
@@ -98,9 +111,14 @@ public final class MetronomeTransport: @unchecked Sendable {
     }
 
     private func startPlannerThread() {
+        lock.lock()
+        plannerGeneration += 1
+        let generation = plannerGeneration
+        lock.unlock()
+
         let thread = Thread { [weak self] in
             guard let self else { return }
-            while self.shouldContinuePlanning() {
+            while self.shouldContinuePlanning(generation: generation) {
                 self.scheduleAheadFromCurrentPlaybackPosition()
                 Thread.sleep(forTimeInterval: self.configuration.refillIntervalSeconds)
             }
@@ -114,9 +132,18 @@ public final class MetronomeTransport: @unchecked Sendable {
         thread.start()
     }
 
-    private func shouldContinuePlanning() -> Bool {
+    private func shouldContinuePlanning(generation: Int) -> Bool {
         lock.lock()
-        let result = isRunning && !(plannerThread?.isCancelled ?? false)
+        let result = isRunning
+            && plannerGeneration == generation
+            && !(plannerThread?.isCancelled ?? true)
+        lock.unlock()
+        return result
+    }
+
+    private func shouldScheduleEvents(for revision: Int) -> Bool {
+        lock.lock()
+        let result = isRunning && scheduleRevision == revision && audioEngine != nil
         lock.unlock()
         return result
     }
@@ -138,6 +165,7 @@ public final class MetronomeTransport: @unchecked Sendable {
             lock.unlock()
             return
         }
+        let revision = scheduleRevision
 
         let lowerBound = max(0, scheduledThroughSample + 1)
         let upperBound = max(lowerBound, currentSample + lookaheadSamples)
@@ -150,6 +178,7 @@ public final class MetronomeTransport: @unchecked Sendable {
         lock.unlock()
 
         let events = scheduler.events(from: lowerBound, through: upperBound)
+        guard shouldScheduleEvents(for: revision) else { return }
         engine.schedule(events)
     }
 }

@@ -328,8 +328,7 @@ struct MetronomeView: View {
                 Label(viewModel.isPlaying ? "Stop" : "Play", systemImage: viewModel.isPlaying ? "stop.fill" : "play.fill")
                     .frame(minWidth: 112)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .buttonStyle(PrimaryTransportButtonStyle())
 
             Button {
                 viewModel.tapTempo()
@@ -464,6 +463,32 @@ struct MetronomeView: View {
         case .increaseTempo:
             viewModel.adjustTempo(by: 1)
         }
+    }
+}
+
+private struct PrimaryTransportButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 9)
+            .background {
+                Capsule()
+                    .fill(Color.appAccent.opacity(backgroundOpacity(isPressed: configuration.isPressed)))
+            }
+            .overlay {
+                Capsule()
+                    .stroke(.white.opacity(0.18), lineWidth: 1)
+            }
+            .contentShape(Capsule())
+    }
+
+    private func backgroundOpacity(isPressed: Bool) -> Double {
+        guard isEnabled else { return 0.45 }
+        return isPressed ? 0.82 : 1.0
     }
 }
 

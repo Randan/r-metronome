@@ -6,6 +6,7 @@ import Foundation
 public final class AudioEngineManager {
     public enum EngineError: Error {
         case outputFormatUnavailable
+        case outputUnitUnavailable
         case outputDeviceUnavailable(OSStatus)
     }
 
@@ -138,24 +139,28 @@ public final class AudioEngineManager {
     }
 
     private func applyOutputSelection() throws {
+        guard let audioUnit = engine.outputNode.audioUnit else {
+            throw EngineError.outputUnitUnavailable
+        }
+
+        if let deviceID = outputSelection.deviceID {
+            var selectedDeviceID = deviceID
+            let status = AudioUnitSetProperty(
+                audioUnit,
+                kAudioOutputUnitProperty_CurrentDevice,
+                kAudioUnitScope_Global,
+                0,
+                &selectedDeviceID,
+                UInt32(MemoryLayout<AudioDeviceID>.size)
+            )
+            guard status == noErr else {
+                throw EngineError.outputDeviceUnavailable(status)
+            }
+        }
+
         engine.outputNode.auAudioUnit.channelMap = [
             NSNumber(value: Int32(outputSelection.channelPair.left)),
             NSNumber(value: Int32(outputSelection.channelPair.right))
         ]
-
-        guard let deviceID = outputSelection.deviceID else { return }
-
-        var selectedDeviceID = deviceID
-        let status = AudioUnitSetProperty(
-            engine.outputNode.audioUnit!,
-            kAudioOutputUnitProperty_CurrentDevice,
-            kAudioUnitScope_Global,
-            0,
-            &selectedDeviceID,
-            UInt32(MemoryLayout<AudioDeviceID>.size)
-        )
-        guard status == noErr else {
-            throw EngineError.outputDeviceUnavailable(status)
-        }
     }
 }
