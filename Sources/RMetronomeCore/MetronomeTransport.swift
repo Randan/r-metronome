@@ -5,18 +5,22 @@ public final class MetronomeTransport: @unchecked Sendable {
         public var sampleRate: Double
         public var lookaheadSeconds: Double
         public var refillIntervalSeconds: Double
+        public var updateLeadSeconds: Double
 
         public init(
             sampleRate: Double = 48_000,
             lookaheadSeconds: Double = 1.5,
-            refillIntervalSeconds: Double = 0.25
+            refillIntervalSeconds: Double = 0.25,
+            updateLeadSeconds: Double = 0.05
         ) {
             precondition(sampleRate > 0, "sampleRate must be greater than zero")
             precondition(lookaheadSeconds > 0, "lookaheadSeconds must be greater than zero")
             precondition(refillIntervalSeconds > 0, "refillIntervalSeconds must be greater than zero")
+            precondition(updateLeadSeconds > 0, "updateLeadSeconds must be greater than zero")
             self.sampleRate = sampleRate
             self.lookaheadSeconds = lookaheadSeconds
             self.refillIntervalSeconds = refillIntervalSeconds
+            self.updateLeadSeconds = updateLeadSeconds
         }
     }
 
@@ -55,15 +59,28 @@ public final class MetronomeTransport: @unchecked Sendable {
     }
 
     public func update(state: MetronomeState) {
+        let updateLeadSamples = Int64((configuration.updateLeadSeconds * configuration.sampleRate).rounded(.up))
+        let lookaheadSamples = Int64((configuration.lookaheadSeconds * configuration.sampleRate).rounded(.up))
+
         lock.lock()
         let currentStartSample = scheduler?.startSampleTime ?? 0
+        let currentSample = audioEngine?.currentSampleTime() ?? max(0, scheduledThroughSample - lookaheadSamples)
+        let lowerBound = max(0, currentSample + updateLeadSamples)
+        let upperBound = lowerBound + lookaheadSamples
+
         scheduler = MetronomeScheduler(
             sampleRate: configuration.sampleRate,
             startSampleTime: currentStartSample,
             state: state
         )
         audioEngine?.updateGains(state.layerGains)
+        let scheduler = scheduler
+        let engine = audioEngine
+        scheduledThroughSample = upperBound
         lock.unlock()
+
+        let events = scheduler?.events(from: lowerBound, through: upperBound) ?? []
+        engine?.reschedule(events, interruptingAt: lowerBound)
     }
 
     public func stop() {

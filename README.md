@@ -110,6 +110,14 @@ swift run r-metronome-app
 
 The app includes pattern presets, custom `A n x` beat grids, per-layer mixer gains, output device visibility, tap tempo, mute trainer, tempo ramp, and polyrhythm controls.
 
+Build a release `.app` bundle and DMG:
+
+```bash
+make dmg
+```
+
+The generated package is written to `dist/r-metronome.dmg`.
+
 ## Timing Contract
 
 ```swift

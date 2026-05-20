@@ -1,7 +1,7 @@
 import Foundation
 
 public struct ClickEvent: Equatable, Sendable {
-    public enum Layer: Equatable, Sendable {
+    public enum Layer: CaseIterable, Equatable, Sendable {
         case accent
         case normal
         case subdivision

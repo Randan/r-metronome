@@ -1,4 +1,4 @@
-.PHONY: build test run app dry-run
+.PHONY: build test run app dry-run dmg
 
 build:
 	swift build
@@ -14,3 +14,6 @@ app:
 
 dry-run:
 	swift run r-metronome --dry-run --duration 4
+
+dmg:
+	./scripts/package-dmg.sh

@@ -16,6 +16,7 @@ public final class AudioEngineManager {
     public let polyrhythmNode: AVAudioPlayerNode
 
     private let clickGenerator: ClickGenerator
+    private let silenceBuffer: AVAudioPCMBuffer
 
     private let outputSelection: AudioOutputSelection
 
@@ -30,6 +31,7 @@ public final class AudioEngineManager {
         self.subdivisionNode = AVAudioPlayerNode()
         self.polyrhythmNode = AVAudioPlayerNode()
         self.clickGenerator = ClickGenerator(sampleRate: sampleRate)
+        self.silenceBuffer = Self.makeSilenceBuffer(format: clickGenerator.format)
         self.outputSelection = outputSelection
         configureGraph()
         updateGains(layerGains)
@@ -64,6 +66,20 @@ public final class AudioEngineManager {
         }
     }
 
+    public func reschedule(_ events: [ClickEvent], interruptingAt sampleTime: Int64) {
+        let groupedEvents = Dictionary(grouping: events, by: \.layer)
+        let interruptTime = AVAudioTime(sampleTime: sampleTime, atRate: clickGenerator.format.sampleRate)
+
+        ClickEvent.Layer.allCases.forEach { layer in
+            let node = playerNode(for: layer)
+            node.scheduleBuffer(silenceBuffer, at: interruptTime, options: .interrupts)
+
+            for event in groupedEvents[layer] ?? [] {
+                schedule(event, on: node, options: [])
+            }
+        }
+    }
+
     public func currentSampleTime() -> Int64? {
         guard
             let nodeTime = accentNode.lastRenderTime,
@@ -89,6 +105,16 @@ public final class AudioEngineManager {
         }
     }
 
+    private func schedule(
+        _ event: ClickEvent,
+        on node: AVAudioPlayerNode,
+        options: AVAudioPlayerNodeBufferOptions
+    ) {
+        let buffer = clickGenerator.buffer(for: event.layer)
+        let time = AVAudioTime(sampleTime: event.sampleTime, atRate: clickGenerator.format.sampleRate)
+        node.scheduleBuffer(buffer, at: time, options: options)
+    }
+
     private func playerNode(for layer: ClickEvent.Layer) -> AVAudioPlayerNode {
         switch layer {
         case .accent:
@@ -100,6 +126,15 @@ public final class AudioEngineManager {
         case .polyrhythm:
             polyrhythmNode
         }
+    }
+
+    private static func makeSilenceBuffer(format: AVAudioFormat) -> AVAudioPCMBuffer {
+        let frameCapacity: AVAudioFrameCount = 64
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCapacity) else {
+            preconditionFailure("Unable to allocate silence buffer")
+        }
+        buffer.frameLength = frameCapacity
+        return buffer
     }
 
     private func applyOutputSelection() throws {
