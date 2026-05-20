@@ -77,6 +77,10 @@ final class MetronomeViewModel {
         }
     }
 
+    func applyDisplayChange() {
+        saveSettings()
+    }
+
     func applyGroupingText() {
         if let grouping = try? Pattern.parseGrouping(groupingText), !grouping.isEmpty {
             beatsPerMeasure = grouping.reduce(0, +)

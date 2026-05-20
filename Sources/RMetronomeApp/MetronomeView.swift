@@ -100,7 +100,7 @@ struct MetronomeView: View {
                 .labelsHidden()
                 .pickerStyle(.segmented)
                 .frame(width: 180)
-                .onChange(of: viewModel.pendulumMode) { _, _ in viewModel.applyChangedTiming() }
+                .onChange(of: viewModel.pendulumMode) { _, _ in viewModel.applyDisplayChange() }
 
                 BeatIndicator(
                     mode: viewModel.pendulumMode,
